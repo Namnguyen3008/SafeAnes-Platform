@@ -25,9 +25,14 @@ RUN python -m pip install --no-cache-dir --index-url https://download.pytorch.or
     && groupadd --system --gid 10001 safeanes \
     && useradd --system --uid 10001 --gid safeanes --create-home safeanes
 
+RUN mkdir -p /app/data/manifests /app/data/vitaldb/manifests /app/data/vitaldb/raw \
+    && chown -R safeanes:safeanes /app/data
+
 COPY backend/__init__.py /app/backend/__init__.py
 COPY backend/app /app/backend/app
 COPY backend/logging.json /app/backend/logging.json
+COPY backend/data/manifests /app/data/manifests
+COPY backend/data/vitaldb/manifests /app/data/vitaldb/manifests
 COPY scripts /app/scripts
 
 USER 10001:10001

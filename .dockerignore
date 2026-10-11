@@ -8,7 +8,11 @@ coverage
 .waveform-qa-cache
 **/__pycache__
 **/*.py[cod]
-backend/data
+backend/data/vitaldb/raw
+backend/data/vitaldb/cache
+backend/data/vitaldb/processed
+!backend/data/manifests
+!backend/data/vitaldb/manifests
 data
 model
 models

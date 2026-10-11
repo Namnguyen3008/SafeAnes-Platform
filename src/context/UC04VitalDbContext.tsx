@@ -28,6 +28,7 @@ import {
   type VitalDbReplayBuffers,
 } from "@/adapters/vitalDbReplayBuffer";
 import { retainReplayEventSelectionAtTime } from "./vitalDbReplaySelection";
+import { fetchSupabaseCases } from "@/lib/api/supabaseVitalDbClient";
 
 export type SafeAnesDataSourceMode = "SYNTHETIC_DEMO" | "VITALDB_REPLAY";
 export type UC04SourceMode = SafeAnesDataSourceMode;
@@ -153,7 +154,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     let cancelled = false;
     void Promise.allSettled([safeAnesClient.listCases(), safeAnesClient.listModels()])
-      .then(([caseResult, modelResult]) => {
+      .then(async ([caseResult, modelResult]) => {
         if (cancelled) return;
         let selectable: VitalDbCaseSummary[] = [];
         if (caseResult.status === "fulfilled") {
@@ -164,6 +165,22 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
           setDatasetVersion(catalog.dataset_version);
         } else {
           setError(errorText(caseResult.reason));
+        }
+
+        // Direct Supabase fallback if backend catalog is empty, unreachable, or cold-starting
+        if (selectable.length === 0) {
+          try {
+            const supaCases = await fetchSupabaseCases();
+            if (supaCases.length > 0) {
+              selectable = supaCases;
+              setCases(selectable);
+              setDataset("VitalDB");
+              setDatasetVersion("1.0.1");
+              setError(null);
+            }
+          } catch {
+            // Keep existing error if Supabase also fails
+          }
         }
         if (modelResult.status === "fulfilled") setModelStatuses(modelResult.value.models);
         else setError(errorText(modelResult.reason));

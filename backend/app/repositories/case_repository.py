@@ -97,7 +97,7 @@ class CaseRepository:
                 "coverage_summary": _dict_or_empty(row.get("coverage_summary")),
                 "number_of_valid_windows": _dict_or_empty(row.get("number_of_valid_windows")),
                 "inference_readiness": _dict_or_empty(row.get("inference_readiness")),
-                "cache_status": "READY" if raw_path.is_file() else "CACHE_NOT_READY",
+                "cache_status": "READY" if (raw_path.is_file() or (self.settings.vitaldb_root / "manifests" / f"{case_id}.json").is_file()) else "CACHE_NOT_READY",
             })
         return {
             "dataset": str(catalog.get("dataset", "VitalDB")),

@@ -66,6 +66,18 @@ class VitalDBRepository:
         with self._lock:
             vf = self._files.get(key)
             if vf is None:
+                if not raw_path.is_file():
+                    try:
+                        import urllib.request
+                        raw_path.parent.mkdir(parents=True, exist_ok=True)
+                        download_url = f"https://api.vitaldb.net/{normalized}.vital"
+                        urllib.request.urlretrieve(download_url, str(raw_path))
+                    except Exception as exc:
+                        raise ApiServiceError(
+                            "CACHE_NOT_READY",
+                            f"VitalDB case {normalized} raw file could not be downloaded",
+                            status_code=503,
+                        ) from exc
                 try:
                     vf = self.vitaldb.VitalFile(str(raw_path), track_names=[track_name])
                 except Exception as exc:
