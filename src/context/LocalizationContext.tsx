@@ -19,7 +19,7 @@ interface LocalizationContextType {
 const LocalizationContext = createContext<LocalizationContextType | null>(null);
 
 const STORAGE_KEY = "safeanes_locale";
-const DEFAULT_LOCALE: Locale = "en";
+const DEFAULT_LOCALE: Locale = "vi";
 
 function getNestedValue(obj: any, path: string): string | undefined {
   if (!obj || !path) return undefined;

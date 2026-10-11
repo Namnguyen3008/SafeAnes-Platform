@@ -16,7 +16,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const localeCookie = (await cookies()).get("safeanes_locale")?.value;
-  const initialLocale: Locale = localeCookie === "vi" ? "vi" : "en";
+  const initialLocale: Locale = localeCookie === "en" ? "en" : "vi";
 
   return (
     <html lang={initialLocale} className="dark">
