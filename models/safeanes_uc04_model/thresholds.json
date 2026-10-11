@@ -1,0 +1,6 @@
+{
+  "5m": 0.5,
+  "target_false_alerts_per_hour": 0.5,
+  "persistence": 2,
+  "cooldown_sec": 300
+}

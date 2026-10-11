@@ -20,10 +20,13 @@ backend/data/vitaldb/cache
 !backend/data/vitaldb/manifests/**
 data
 model
-models
 **/*.vital
-**/*.pt
 **/*.pth
+!models
+!models/**
+!models/**/*.pt
+!models/**/*.json
+!models/**/*.md
 .env
 .env.*
 !.env.example

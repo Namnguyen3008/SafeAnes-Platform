@@ -27,11 +27,12 @@ backend/build/
 !/backend/data/vitaldb/manifests/**
 /data/
 /model/
-/models/
-!backend/app/ml/models/
-!backend/app/ml/models/**
+!/models/
+!/models/**
+!/models/**/*.pt
+!/models/**/*.json
+!/models/**/*.md
 *.vital
-*.pt
 *.pth
 *.log
 logs/

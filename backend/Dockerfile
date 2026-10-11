@@ -25,7 +25,7 @@ RUN python -m pip install --no-cache-dir --index-url https://download.pytorch.or
     && groupadd --system --gid 10001 safeanes \
     && useradd --system --uid 10001 --gid safeanes --create-home safeanes
 
-RUN mkdir -p /app/data/manifests /app/data/vitaldb/manifests /app/data/vitaldb/raw /app/data/processed /app/data/vitaldb/processed
+RUN mkdir -p /models /app/data/manifests /app/data/vitaldb/manifests /app/data/vitaldb/raw /app/data/processed /app/data/vitaldb/processed
 
 COPY backend/__init__.py /app/backend/__init__.py
 COPY backend/app /app/backend/app
@@ -35,10 +35,11 @@ COPY backend/data/vitaldb/manifests /app/data/vitaldb/manifests
 COPY backend/data/processed /app/data/processed
 COPY backend/data/vitaldb/processed /app/data/vitaldb/processed
 COPY scripts /app/scripts
+COPY models /models
 
 # Pre-download verified raw .vital files for catalog cases during build
 RUN python -c "import urllib.request; [urllib.request.urlretrieve(f'https://api.vitaldb.net/1.0.1/{c}.vital', f'/app/data/vitaldb/raw/{c}.vital') for c in ['1', '6388', '3300']]" \
-    && chown -R safeanes:safeanes /app/data
+    && chown -R safeanes:safeanes /app/data /models
 
 USER 10001:10001
 EXPOSE 8000
