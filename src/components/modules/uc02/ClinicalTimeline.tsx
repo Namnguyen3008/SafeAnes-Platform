@@ -6,6 +6,8 @@ import {
   Clock,
   Layers,
   AlertTriangle,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { useClinicalReview } from "@/context/ClinicalReviewContext";
 import { useTranslation } from "@/context/LocalizationContext";
@@ -71,7 +73,15 @@ const TRACK_CONFIGS: TrackConfig[] = [
   },
 ];
 
-export function ClinicalTimeline() {
+interface ClinicalTimelineProps {
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
+}
+
+export function ClinicalTimeline({
+  isMaximized = false,
+  onToggleMaximize,
+}: ClinicalTimelineProps = {}) {
   const {
     events,
     selectedEventId,
@@ -238,6 +248,27 @@ export function ClinicalTimeline() {
             <Clock className="w-3 h-3 text-safe-cyan" />
             <span>{t("timeline.scrubber", { time: selectedTime })}</span>
           </div>
+
+          {onToggleMaximize && (
+            <button
+              type="button"
+              onClick={onToggleMaximize}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-[2px] bg-safe-surface-secondary border border-safe-cyan/50 text-safe-cyan hover:bg-safe-cyan/20 text-[10.5px] font-mono font-semibold transition-colors cursor-pointer"
+              title={isMaximized ? "Thu nhỏ về kích thước chuẩn" : "Phóng to dòng thời gian toàn màn hình"}
+            >
+              {isMaximized ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5 text-safe-cyan" />
+                  <span>Thu nhỏ</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-safe-cyan" />
+                  <span>Phóng to</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

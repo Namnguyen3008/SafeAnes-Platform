@@ -9,7 +9,7 @@ import { useTranslation } from "@/context/LocalizationContext";
 import { useClinicalReview } from "@/context/ClinicalReviewContext";
 
 export function ReviewTable() {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   const { t } = useTranslation("uc02");
   const { totalClaimsCount } = useClinicalReview();
 

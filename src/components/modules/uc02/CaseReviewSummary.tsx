@@ -85,6 +85,7 @@ export function CaseReviewSummary() {
     {
       id: "unsupported_claims",
       label: t("kpi.unsupportedClaims"),
+      shortLabel: "Thiếu căn cứ",
       unit: t("kpi.units.unlinked"),
       value: String(errorMetrics.unsupportedClaims),
       min: "0",
@@ -95,52 +96,142 @@ export function CaseReviewSummary() {
   ];
 
   return (
-    <section className="w-full flex gap-2 h-[142px] shrink-0 select-none">
-      {/* Left Patient Context & Review Completeness Panel (Prime position, fluid width) */}
-      <PatientContextSummary
-        patient={patient}
-        isRecordSigned={isRecordSigned}
-        reviewProgressPercent={reviewProgressPercent}
-        className="flex-1 min-w-[500px]"
-      />
+    <section className="w-full bg-safe-surface border border-safe-border rounded-[2px] p-2 flex flex-col justify-between h-[118px] shrink-0 select-none shadow-sm overflow-hidden">
+      {/* 1. Top Header Bar: Patient Title, Case Badge, Completeness Bar, Review Status */}
+      <div className="flex items-center justify-between pb-1.5 border-b border-safe-border gap-2 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[13px] font-bold text-safe-text tracking-tight uppercase shrink-0">
+            {t("patientContext.title") || "Thông tin bệnh nhân"}
+          </span>
+          <span className="text-[11px] font-mono font-bold text-safe-cyan bg-safe-surface-secondary px-2 py-0.5 rounded-[2px] border border-safe-border shrink-0">
+            {patient.caseId}
+          </span>
+          <span className="text-[10px] font-mono text-safe-text-muted bg-safe-bg px-2 py-0.5 rounded-[2px] border border-safe-border-light truncate hidden sm:inline">
+            OR 2 · {patient.ageSex} · Phân độ {patient.asaStatus}
+          </span>
+        </div>
 
-      {/* Right Compact 6-Card Metric Grid (3x2, 440px width) */}
-      <div className="w-[440px] shrink-0 grid grid-cols-3 grid-rows-2 gap-1.5 h-full">
-        {kpiMetrics.map((m) => (
-          <div
-            key={m.id}
-            className="bg-safe-surface border border-safe-border rounded-[2px] p-1.5 flex flex-col justify-between relative overflow-hidden"
-          >
-            {/* Header label & unit */}
-            <div className="flex items-center justify-between gap-1 leading-none">
-              <span className="text-[10px] font-bold text-safe-text tracking-tight uppercase truncate" title={m.label}>
-                {m.label}
+        {/* Center Completeness & Right Review Status Badges */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {reviewProgressPercent !== undefined && (
+            <div className="flex items-center gap-1.5 bg-safe-surface-secondary border border-safe-border-light rounded-[2px] px-2 py-0.5">
+              <span className="text-[10.5px] text-safe-text-muted font-medium">
+                {t("patientContext.recordCompleteness") || "Độ hoàn thiện"}:
               </span>
-              <span className="text-[8.5px] text-safe-text-muted font-mono shrink-0">
-                {m.unit}
+              <div className="w-16 bg-safe-surface h-1.5 rounded-none overflow-hidden border border-safe-border-light">
+                <div
+                  className="bg-safe-green h-full transition-all duration-300"
+                  style={{ width: `${reviewProgressPercent}%` }}
+                />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-safe-green tabular-nums">
+                {reviewProgressPercent}%
               </span>
             </div>
+          )}
 
-            {/* Numeric & Mini Bar */}
-            <div className="flex items-baseline justify-between my-0.5">
-              <span
-                className="text-[22px] font-bold font-mono tabular-nums leading-none"
-                style={{ color: m.color }}
-              >
-                {m.value}
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="w-12 bg-safe-surface-secondary h-1.5 rounded-none overflow-hidden border border-safe-border-light">
-                  <div
-                    className="h-full transition-all duration-300"
-                    style={{ width: `${m.percentage}%`, backgroundColor: m.color }}
-                  />
-                </div>
-                <span className="text-[8.5px] font-mono text-safe-text-muted">{m.max}</span>
-              </div>
+          <div
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] text-[10.5px] font-mono font-semibold shrink-0 ${
+              isRecordSigned
+                ? "bg-safe-surface-secondary border border-safe-green/50 text-safe-green"
+                : "bg-safe-surface-secondary border border-safe-yellow/50 text-safe-yellow"
+            }`}
+          >
+            {isRecordSigned ? (
+              <span>{t("patientContext.reviewApproved") || "Duyệt: Đã ký"}</span>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-safe-yellow animate-pulse" />
+                <span>{t("patientContext.reviewInProgress") || "Duyệt: Đang thực hiện"}</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Main Row: Left Demographics & Vitals (65%), Right 21st.dev KPI Stat Pills (35%) */}
+      <div className="flex items-center gap-3 pt-1 min-h-0 flex-1">
+        {/* Left: 3 Balanced Clinical Columns */}
+        <div className="flex-1 grid grid-cols-3 gap-x-4 pr-3 border-r border-safe-border-light/60 text-[11.5px] leading-snug">
+          {/* Col 1: Age/Sex & Weight */}
+          <div className="flex flex-col justify-around gap-1">
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.ageSex") || "Tuổi / Giới"}:</span>
+              <span className="text-safe-text font-mono font-bold text-[12px]">{patient.ageSex}</span>
+            </div>
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.weight") || "Cân nặng"}:</span>
+              <span className="text-safe-text font-mono font-bold text-[12px]">{patient.weightBmi}</span>
             </div>
           </div>
-        ))}
+
+          {/* Col 2: ASA & Baseline Hemodynamics */}
+          <div className="flex flex-col justify-around gap-1 px-2 border-r border-safe-border-light/40">
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.asaStatus") || "Phân độ ASA"}:</span>
+              <span className="text-safe-yellow font-bold font-mono text-[11px] bg-safe-yellow/15 px-1.5 py-0.2 rounded border border-safe-yellow/40">
+                {patient.asaStatus}
+              </span>
+            </div>
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.preopMap") || "MAP trước mổ"}:</span>
+              <span className="text-safe-text font-mono font-bold text-[12px]">{patient.preopMap}</span>
+            </div>
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.baselineCi") || "CI nền"}:</span>
+              <span className="text-safe-text font-mono font-bold text-[12px]">{patient.baselineCi}</span>
+            </div>
+          </div>
+
+          {/* Col 3: Allergies, Comorbidities, Procedure */}
+          <div className="flex flex-col justify-around gap-1 pl-1 min-w-0">
+            <div className="flex items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.allergies") || "Dị ứng"}:</span>
+              <span className="text-safe-red font-bold truncate text-[11px]" title={patient.allergies}>
+                {patient.allergies || "—"}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.comorbidities") || "Bệnh đồng mắc"}:</span>
+              <span className="text-safe-text font-medium truncate text-[11px]" title={patient.comorbidities}>
+                {patient.comorbidities || "—"}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-safe-text-muted text-[11px] shrink-0">{t("patientContext.procedure") || "Phẫu thuật"}:</span>
+              <span className="text-safe-cyan font-bold truncate text-[11px]" title={patient.procedure}>
+                {patient.procedure}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: 6 KPI Clinical Stat Pills (Clean 3x2 Grid inspired by 21st.dev) */}
+        <div className="w-[330px] shrink-0 grid grid-cols-3 grid-rows-2 gap-1.5 h-full">
+          {kpiMetrics.map((m) => (
+            <div
+              key={m.id}
+              className="bg-safe-surface-secondary border border-safe-border-light rounded-[2px] p-1.5 flex flex-col justify-between overflow-hidden"
+              title={`${m.label}: ${m.value}`}
+            >
+              <div className="flex items-center justify-between text-[9px] text-safe-text-muted font-mono leading-none">
+                <span className="uppercase tracking-tight truncate">
+                  {m.shortLabel || m.label}
+                </span>
+                <span className="text-[8px] text-safe-text-muted/60">/{m.max}</span>
+              </div>
+              <div className="flex items-baseline justify-between mt-1">
+                <span
+                  className="text-[17px] font-bold font-mono tabular-nums leading-none"
+                  style={{ color: m.color }}
+                >
+                  {m.value}
+                </span>
+                <span className="text-[8px] text-safe-text-muted font-mono">{m.unit}</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
