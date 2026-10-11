@@ -213,7 +213,13 @@ class CaseRepository:
             if isinstance(item, dict) and item.get("track_name")
         ]
 
-    def raw_path(self, case_id: str | int, *, verify_checksum: bool = True) -> Path:
+    def raw_path(
+        self,
+        case_id: str | int,
+        *,
+        verify_checksum: bool = True,
+        allow_missing: bool = False,
+    ) -> Path:
         normalized = normalize_case_id(case_id)
         manifest = self.get_manifest(normalized)
         raw = _dict_or_empty(manifest.get("raw_file"))
@@ -223,7 +229,11 @@ class CaseRepository:
             raise cache_not_ready(f"VitalDB case {normalized} has no local raw-file manifest entry")
         raw_root = (self.settings.vitaldb_root / "raw").resolve()
         candidate = (self.settings.vitaldb_root / relative).resolve()
-        if not _is_within(candidate, raw_root) or not candidate.is_file():
+        if not _is_within(candidate, raw_root):
+            raise cache_not_ready(f"VitalDB case {normalized} raw file path is invalid")
+        if not candidate.is_file():
+            if allow_missing:
+                return candidate
             raise cache_not_ready(f"VitalDB case {normalized} raw file is missing from the local cache")
         if verify_checksum:
             self._verify_checksum(normalized, candidate, expected_hash)

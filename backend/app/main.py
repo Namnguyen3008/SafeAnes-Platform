@@ -133,12 +133,10 @@ def create_app(
         request.state.request_id = request_id
         started = time.perf_counter()
         path = request.url.path
-        protected_api = path.startswith("/api/v1/") and not (
-            path == "/api/v1/health/live"
-            or path == "/api/v1/health/ready"
-            or path == "/api/v1/models"
-            or path.startswith("/api/v1/cases")
-        )
+        protected_api = path.startswith("/api/v1/") and path not in {
+            "/api/v1/health/live",
+            "/api/v1/health/ready",
+        }
         if configured.api_token and protected_api and request.method != "OPTIONS":
             authorization = request.headers.get("Authorization", "")
             scheme, _, supplied_token = authorization.partition(" ")

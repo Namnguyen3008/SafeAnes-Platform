@@ -3,7 +3,7 @@
  * Provides resilient, zero-downtime access to recorded surgical data directly from Supabase PostgreSQL.
  */
 
-import type { VitalDbCaseSummary, TrackMetadata } from "./safeanesClient";
+import type { VitalDbCaseSummary, TrackMetadata, CaseDetailResponse } from "./safeanesClient";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://nntxlqchytvfmutmixea.supabase.co";
 const SUPABASE_KEY =
@@ -154,3 +154,67 @@ export async function fetchSupabaseSignalWindows(
     return [];
   }
 }
+
+export async function fetchSupabaseCaseDetail(caseId: string): Promise<CaseDetailResponse | null> {
+  try {
+    const cleanId = caseId.replace(/^case_vitaldb_/, "");
+    const url = `${SUPABASE_URL}/rest/v1/safeanes_cases?id=in.(${encodeURIComponent(cleanId)},${encodeURIComponent(`case_vitaldb_${cleanId}`)})&select=*&limit=1`;
+    const resp = await fetch(url, { headers: headers(), cache: "no-store" });
+    if (!resp.ok) return null;
+    const rows = (await resp.json()) as SupabaseCaseRow[];
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      case_id: cleanId,
+      dataset: "VitalDB",
+      dataset_version: "1.0.1",
+      source: "official_dataset",
+      source_uri: `https://api.vitaldb.net/1.0.1/${cleanId}.vital`,
+      duration_seconds: Number(r.duration_s || 0),
+      time_basis: "seconds_since_case_start",
+      patient_context: {
+        age: r.age,
+        sex: r.sex,
+        height: r.height,
+        weight: r.weight,
+        bmi: r.bmi,
+        asa: r.asa,
+        op_name: r.op_name,
+        department: r.department,
+      },
+      eligibility: r.metadata?.eligibility ?? { uc04: true, uc05: true },
+      available_signals: r.metadata?.available_signals ?? [],
+      raw_file: {
+        cache_status: "READY",
+        size_bytes: 17561476,
+        immutable: true,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSupabaseEventsAsCaseEvents(caseId: string): Promise<Array<{
+  case_id: string;
+  timestamp: number;
+  event_type: string;
+  description: string;
+  source: string;
+  quality: string;
+  is_missing: boolean;
+  provenance: Record<string, unknown>;
+}>> {
+  const rows = await fetchSupabaseEvents(caseId);
+  return rows.map((r) => ({
+    case_id: caseId,
+    timestamp: Number(r.timestamp_s ?? 0),
+    event_type: r.event_type || "VITALDB_ANNOTATION",
+    description: r.value || r.name || "",
+    source: r.source_system || "VitalDB EVENT",
+    quality: "UNKNOWN",
+    is_missing: false,
+    provenance: { source: "VitalDB", track_name: "EVENT", ref: r.provenance_ref },
+  }));
+}
+

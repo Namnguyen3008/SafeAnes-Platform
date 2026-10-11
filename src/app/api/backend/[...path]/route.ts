@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  fetchSupabaseCases,
+  fetchSupabaseCaseDetail,
+  fetchSupabaseTracks,
+  fetchSupabaseEventsAsCaseEvents,
+} from "@/lib/api/supabaseVitalDbClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +18,48 @@ const FORWARDED_RESPONSE_HEADERS = [
   "x-request-id",
   "last-event-id",
 ];
+
+async function handleSupabaseFallback(path: string[]): Promise<Response | null> {
+  try {
+    if (path.length === 2 && path[0] === "v1" && path[1] === "cases") {
+      const cases = await fetchSupabaseCases();
+      if (cases.length > 0) {
+        return NextResponse.json(
+          { dataset: "VitalDB", dataset_version: "1.0.1", cases },
+          { headers: { "cache-control": "no-store, no-transform" } },
+        );
+      }
+    }
+    if (path.length === 3 && path[0] === "v1" && path[1] === "cases") {
+      const caseId = path[2];
+      const detail = await fetchSupabaseCaseDetail(caseId);
+      if (detail) {
+        return NextResponse.json(detail, { headers: { "cache-control": "no-store, no-transform" } });
+      }
+    }
+    if (path.length === 4 && path[0] === "v1" && path[1] === "cases" && path[3] === "tracks") {
+      const caseId = path[2];
+      const tracks = await fetchSupabaseTracks(caseId);
+      if (tracks.length > 0) {
+        return NextResponse.json(
+          { case_id: caseId, tracks },
+          { headers: { "cache-control": "no-store, no-transform" } },
+        );
+      }
+    }
+    if (path.length === 4 && path[0] === "v1" && path[1] === "cases" && path[3] === "events") {
+      const caseId = path[2];
+      const events = await fetchSupabaseEventsAsCaseEvents(caseId);
+      return NextResponse.json(
+        { case_id: caseId, time_basis: "seconds_since_case_start", events },
+        { headers: { "cache-control": "no-store, no-transform" } },
+      );
+    }
+  } catch {
+    // If Supabase query fails, fall back to default error response
+  }
+  return null;
+}
 
 async function proxy(request: Request, context: RouteContext): Promise<Response> {
   const method = request.method.toUpperCase();
@@ -55,6 +103,10 @@ async function proxy(request: Request, context: RouteContext): Promise<Response>
       redirect: "manual",
       signal: request.signal,
     });
+    if (upstream.status >= 500) {
+      const fallback = await handleSupabaseFallback(path);
+      if (fallback) return fallback;
+    }
     const responseHeaders = new Headers();
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
@@ -66,6 +118,8 @@ async function proxy(request: Request, context: RouteContext): Promise<Response>
       headers: responseHeaders,
     });
   } catch {
+    const fallback = await handleSupabaseFallback(path);
+    if (fallback) return fallback;
     return NextResponse.json(
       { error: { code: "BACKEND_UNAVAILABLE", message: "The SafeAnes backend is unavailable." } },
       { status: 502 },

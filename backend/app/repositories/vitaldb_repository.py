@@ -61,7 +61,13 @@ class VitalDBRepository:
         normalized = normalize_case_id(case_id)
         track_metadata = self.cases.get_track(normalized, track_name)
         manifest = self.cases.get_manifest(normalized)
-        raw_path = self.cases.raw_path(normalized)
+        try:
+            raw_path = self.cases.raw_path(normalized, verify_checksum=True)
+        except ApiServiceError as exc:
+            if exc.code == "CACHE_NOT_READY" and "missing from the local cache" in exc.message:
+                raw_path = self.cases.raw_path(normalized, verify_checksum=False, allow_missing=True)
+            else:
+                raise
         key = (normalized, track_name)
         with self._lock:
             vf = self._files.get(key)
@@ -78,6 +84,10 @@ class VitalDBRepository:
                             f"VitalDB case {normalized} raw file could not be downloaded",
                             status_code=503,
                         ) from exc
+                    try:
+                        self.cases.raw_path(normalized, verify_checksum=True)
+                    except Exception:
+                        pass
                 try:
                     vf = self.vitaldb.VitalFile(str(raw_path), track_names=[track_name])
                 except Exception as exc:
