@@ -311,8 +311,8 @@
 
 @media (max-width: 1599px) {
   .uc02-review-regions {
-    grid-template-columns: minmax(0, 1fr) minmax(380px, 410px);
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(390px, 420px);
+    grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
     grid-template-areas: "timeline record" "timeline evidence";
   }
 }

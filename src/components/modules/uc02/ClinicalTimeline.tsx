@@ -243,17 +243,17 @@ export function ClinicalTimeline() {
 
       {/* 2. Multi-Track Custom SVG Body */}
       <div className="relative flex-1 my-1 flex overflow-hidden">
-        {/* Left Track Headers Column (~135px width) */}
-        <div className="w-[135px] shrink-0 flex flex-col justify-between py-1 pr-2 text-right border-r border-safe-border">
+        {/* Left Track Headers Column (~155px width) */}
+        <div className="w-[155px] shrink-0 flex flex-col justify-between py-1 pr-2 text-right border-r border-safe-border">
           {TRACK_CONFIGS.map((track) => (
             <div
               key={track.id}
               className="flex flex-col justify-center h-[16.6%] border-b border-safe-border-light/40 last:border-b-0"
             >
-              <span className="text-[11px] font-semibold text-safe-text whitespace-normal break-words leading-tight" title={t(`timeline.tracks.${track.nameKey}`)}>
+              <span className="text-[11.5px] font-bold text-safe-text whitespace-normal break-words leading-tight" title={t(`timeline.tracks.${track.nameKey}`)}>
                 {t(`timeline.tracks.${track.nameKey}`)}
               </span>
-              <span className="text-[8.5px] text-safe-text-muted font-mono whitespace-normal break-words leading-tight" title={t(`timeline.tracks.${track.subTitleKey}`)}>
+              <span className="text-[9.5px] text-safe-text-muted font-mono whitespace-normal break-words leading-tight" title={t(`timeline.tracks.${track.subTitleKey}`)}>
                 {t(`timeline.tracks.${track.subTitleKey}`)}
               </span>
             </div>
@@ -702,7 +702,7 @@ export function ClinicalTimeline() {
 
       {/* Shared case-clock ticks are derived from the current canonical timeline window. */}
       <div className="flex min-w-0 items-center text-[10px] font-mono text-safe-text-muted pt-1 border-t border-safe-border tabular-nums select-none">
-        <div className="w-[135px] shrink-0" aria-hidden="true" />
+        <div className="w-[155px] shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0 px-2 flex justify-between">
           {timeTicks.filter((_, index) => index % axisLabelStep === 0 || index === timeTicks.length - 1).map((tick) => (
             <button

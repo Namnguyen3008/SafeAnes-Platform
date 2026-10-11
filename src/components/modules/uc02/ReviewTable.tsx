@@ -7,7 +7,7 @@ import { BenchmarkModeCard } from "./BenchmarkModeCard";
 
 export function ReviewTable() {
   return (
-    <div className="w-full h-[250px] shrink-0 grid grid-cols-[minmax(0,1.8fr)_minmax(230px,0.8fr)_minmax(200px,0.7fr)] gap-2 select-none overflow-hidden">
+    <div className="w-full h-[200px] shrink-0 grid grid-cols-[minmax(0,1.8fr)_minmax(230px,0.8fr)_minmax(200px,0.7fr)] gap-2 select-none overflow-hidden">
       {/* 1. Left: Claim Review Table (~55-60% width) */}
       <ClaimReviewTable />
 

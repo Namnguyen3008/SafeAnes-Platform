@@ -22,12 +22,12 @@ export function PatientContextSummary({
 
   return (
     <div
-      className={`bg-safe-surface border border-safe-border rounded-[2px] p-2 flex flex-col justify-between ${className}`}
+      className={`bg-safe-surface border border-safe-border rounded-[2px] p-1.5 px-2.5 flex flex-col justify-between ${className}`}
     >
       {/* Top Header with Review Status Badges */}
       <div className="flex items-center justify-between pb-1 border-b border-safe-border">
         <div className="flex items-center gap-2">
-          <span className="text-[14.5px] font-semibold text-safe-text">
+          <span className="text-[14px] font-semibold text-safe-text">
             {t("patientContext.title")}
           </span>
           <span className="text-[10px] font-mono text-safe-cyan bg-safe-surface-secondary px-1.5 py-0.2 rounded-[2px] border border-safe-border">
@@ -59,9 +59,9 @@ export function PatientContextSummary({
 
       {/* Record Completeness Strip (if provided) */}
       {reviewProgressPercent !== undefined && (
-        <div className="flex items-center justify-between bg-safe-surface-secondary border border-safe-border-light rounded-[2px] px-2 py-1 my-0.5">
-          <div className="flex items-center gap-1.5 text-[11px] text-safe-text-muted">
-            <CheckCircle2 className="w-3.5 h-3.5 text-safe-green" />
+        <div className="flex items-center justify-between bg-safe-surface-secondary border border-safe-border-light rounded-[2px] px-2 py-0.5 my-0.5">
+          <div className="flex items-center gap-1.5 text-[10.5px] text-safe-text-muted">
+            <CheckCircle2 className="w-3 h-3 text-safe-green" />
             <span>{t("patientContext.recordCompleteness")}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -71,7 +71,7 @@ export function PatientContextSummary({
                 style={{ width: `${reviewProgressPercent}%` }}
               />
             </div>
-            <span className="font-mono text-[12px] font-bold text-safe-green tabular-nums">
+            <span className="font-mono text-[11.5px] font-bold text-safe-green tabular-nums">
               {reviewProgressPercent}%
             </span>
           </div>
@@ -79,49 +79,49 @@ export function PatientContextSummary({
       )}
 
       {/* 2-Column Clinical Metadata Grid */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11.5px] leading-tight">
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.ageSex")}</span>
-          <span className="text-safe-text font-mono">{patient.ageSex}</span>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] leading-snug">
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.ageSex")}</span>
+          <span className="text-safe-text font-mono font-medium truncate">{patient.ageSex}</span>
         </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.allergies")}</span>
-          <span className="text-safe-red font-medium truncate max-w-[85px]">
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.allergies")}</span>
+          <span className="text-safe-red font-medium truncate max-w-[125px]" title={patient.allergies}>
             {patient.allergies}
           </span>
         </div>
 
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.weight")}</span>
-          <span className="text-safe-text font-mono">{patient.weightBmi}</span>
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.weight")}</span>
+          <span className="text-safe-text font-mono font-medium truncate">{patient.weightBmi}</span>
         </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.comorbidities")}</span>
-          <span className="text-safe-text truncate max-w-[85px]">
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.comorbidities")}</span>
+          <span className="text-safe-text truncate max-w-[125px]" title={patient.comorbidities}>
             {patient.comorbidities}
           </span>
         </div>
 
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.asaStatus")}</span>
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.asaStatus")}</span>
           <span className="text-safe-yellow font-semibold font-mono">
             {patient.asaStatus}
           </span>
         </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.preopMap")}</span>
-          <span className="text-safe-text font-mono">{patient.preopMap}</span>
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.preopMap")}</span>
+          <span className="text-safe-text font-mono font-medium">{patient.preopMap}</span>
         </div>
 
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.procedure")}</span>
-          <span className="text-safe-text truncate max-w-[85px]">
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.procedure")}</span>
+          <span className="text-safe-text truncate max-w-[125px]" title={patient.procedure}>
             {patient.procedure}
           </span>
         </div>
-        <div className="flex justify-between items-baseline">
-          <span className="text-safe-text-muted">{t("patientContext.baselineCi")}</span>
-          <span className="text-safe-text font-mono">{patient.baselineCi}</span>
+        <div className="flex justify-between items-baseline gap-1">
+          <span className="text-safe-text-muted shrink-0">{t("patientContext.baselineCi")}</span>
+          <span className="text-safe-text font-mono font-medium">{patient.baselineCi}</span>
         </div>
       </div>
     </div>

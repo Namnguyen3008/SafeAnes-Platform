@@ -157,12 +157,12 @@ export function CaseReviewSummary() {
         ))}
       </div>
 
-      {/* Right Patient Context & Review Completeness Panel (~35% width, 380px) */}
+      {/* Right Patient Context & Review Completeness Panel (~35% width, 410px) */}
       <PatientContextSummary
         patient={patient}
         isRecordSigned={isRecordSigned}
         reviewProgressPercent={reviewProgressPercent}
-        className="w-[380px] shrink-0"
+        className="w-[410px] shrink-0"
       />
     </section>
   );
