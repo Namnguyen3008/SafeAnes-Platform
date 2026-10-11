@@ -44,7 +44,11 @@ class UC05VitalDBViewService:
         normalized = normalize_case_id(case_id)
         case = self.cases.get_case(normalized)
         if case.get("raw_file", {}).get("cache_status") != "READY":
-            raise cache_not_ready(f"VitalDB raw case {normalized} is not checksum-verified in the local cache")
+            try:
+                self.cases.ensure_raw_cached(normalized)
+                case = self.cases.get_case(normalized)
+            except Exception:
+                raise cache_not_ready(f"VitalDB raw case {normalized} is not checksum-verified in the local cache")
         as_of = _finite_nonnegative(as_of_s, "as_of_s")
         window = _finite_nonnegative(window_seconds, "window_seconds")
         duration = float(case["duration_seconds"])

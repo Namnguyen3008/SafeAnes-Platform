@@ -18,3 +18,7 @@ class CaseService:
     def list_tracks(self, case_id: str) -> list[dict[str, Any]]:
         self.repository.get_case(case_id)
         return self.repository.list_tracks(case_id)
+
+    def ensure_raw_cached(self, case_id: str) -> Any:
+        return self.repository.ensure_raw_cached(case_id)
+

@@ -21,6 +21,10 @@ _MAX_STREAM_CATCH_UP_SECONDS = 90.0
 
 @router.post("", response_model=ReplaySessionResponse, status_code=201)
 def create_session(body: ReplaySessionCreate, request: Request) -> ReplaySessionResponse:
+    try:
+        request.app.state.runtime.case_service.ensure_raw_cached(body.case_id)
+    except Exception:
+        pass
     case = request.app.state.runtime.case_service.get_case(body.case_id)
     result = request.app.state.runtime.replay.create(
         body.case_id,

@@ -38,7 +38,7 @@ COPY scripts /app/scripts
 COPY models /models
 
 # Pre-download verified raw .vital files for catalog cases during build
-RUN python -c "import urllib.request; [urllib.request.urlretrieve(f'https://api.vitaldb.net/1.0.1/{c}.vital', f'/app/data/vitaldb/raw/{c}.vital') for c in ['1', '49', '6388', '3300']]" \
+RUN python -c "import urllib.request; [urllib.request.urlretrieve(f'https://api.vitaldb.net/1.0.1/{c}.vital', f'/app/data/vitaldb/raw/{c}.vital') for c in ['1', '49', '210', '452', '3091', '3300', '3515', '6388']]" \
     && chown -R safeanes:safeanes /app/data /models
 
 USER 10001:10001

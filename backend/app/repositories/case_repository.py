@@ -239,6 +239,30 @@ class CaseRepository:
             self._verify_checksum(normalized, candidate, expected_hash)
         return candidate
 
+    def ensure_raw_cached(self, case_id: str | int) -> Path:
+        normalized = normalize_case_id(case_id)
+        manifest = self.get_manifest(normalized)
+        raw = _dict_or_empty(manifest.get("raw_file"))
+        relative = raw.get("relative_path")
+        expected_hash = raw.get("sha256")
+        if not isinstance(relative, str) or not relative:
+            raise cache_not_ready(f"VitalDB case {normalized} has no local raw-file manifest entry")
+        raw_root = (self.settings.vitaldb_root / "raw").resolve()
+        candidate = (self.settings.vitaldb_root / relative).resolve()
+        if not _is_within(candidate, raw_root):
+            raise cache_not_ready(f"VitalDB case {normalized} raw file path is invalid")
+        if not candidate.is_file():
+            try:
+                import urllib.request
+                candidate.parent.mkdir(parents=True, exist_ok=True)
+                download_url = manifest.get("source_uri") or f"https://api.vitaldb.net/1.0.1/{normalized}.vital"
+                urllib.request.urlretrieve(download_url, str(candidate))
+            except Exception as exc:
+                raise cache_not_ready(f"VitalDB case {normalized} raw file could not be downloaded") from exc
+        if expected_hash:
+            self._verify_checksum(normalized, candidate, expected_hash)
+        return candidate
+
     def _verify_checksum(self, case_id: str, path: Path, expected_hash: Any) -> None:
         if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash):
             raise cache_not_ready(f"VitalDB case {case_id} manifest has no valid raw checksum")
