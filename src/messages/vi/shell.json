@@ -1,0 +1,53 @@
+{
+  "appName": "SafeAnes",
+  "live": "TRỰC TIẾP",
+  "patient": "BỆNH NHÂN:",
+  "case": "CA:",
+  "yearsShort": "tuổi",
+  "female": "Nữ",
+  "male": "Nam",
+  "or": "OR:",
+  "procedure": "PHẪU THUẬT:",
+  "anesthesia": "GÂY MÊ:",
+  "notRecorded": "KHÔNG ĐƯỢC GHI NHẬN",
+  "vitalDbCase": "Ca VitalDB {caseId}",
+  "caseRelativeTime": "THỜI GIAN CA",
+  "recordedData": "DỮ LIỆU ĐÃ GHI",
+  "qualityUnknown": "CHẤT LƯỢNG CHƯA RÕ",
+  "replay": "PHÁT LẠI:",
+  "authoritativeAlarmUnavailable": "VitalDB không cung cấp luồng cảnh báo có thẩm quyền cho chế độ xem này.",
+  "anesthesiaTypes": {
+    "general": "Toàn thân"
+  },
+  "clock": "GIỜ PHÒNG MỔ",
+  "elapsed": "THỜI GIAN:",
+  "telOn": "TEL BẬT",
+  "telDegraded": "TEL LỖI",
+  "telOffline": "TEL MẤT",
+  "sensors": "CẢM BIẾN",
+  "sensorsDegraded": "TÍN HIỆU LỖI",
+  "battery": "Trạng thái pin",
+  "alerts": "CẢNH BÁO",
+  "nav": {
+    "overview": "Tổng quan",
+    "situation": "Tình huống",
+    "record": "Hồ sơ",
+    "medications": "Thuốc",
+    "hemodynamics": "Huyết động",
+    "respiratory": "Hô hấp"
+  },
+  "navTooltips": {
+    "overview": "Tổng quan ca mổ",
+    "situation": "Quy trình chu phẫu & Nhận thức tình huống",
+    "record": "Duyệt hồ sơ gây mê",
+    "medications": "An toàn dùng thuốc",
+    "hemodynamics": "Phân tích huyết động",
+    "respiratory": "Phân tích hô hấp"
+  },
+  "lang": {
+    "en": "EN",
+    "vi": "VI",
+    "switchToEn": "Chuyển sang Tiếng Anh",
+    "switchToVi": "Chuyển sang Tiếng Việt"
+  }
+}

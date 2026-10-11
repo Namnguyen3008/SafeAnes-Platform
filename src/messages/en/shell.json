@@ -1,0 +1,53 @@
+{
+  "appName": "SafeAnes",
+  "live": "LIVE",
+  "patient": "PATIENT:",
+  "case": "CASE:",
+  "yearsShort": "y",
+  "female": "Female",
+  "male": "Male",
+  "or": "OR:",
+  "procedure": "PROCEDURE:",
+  "anesthesia": "ANESTHESIA:",
+  "notRecorded": "NOT RECORDED",
+  "vitalDbCase": "VitalDB case {caseId}",
+  "caseRelativeTime": "CASE TIME",
+  "recordedData": "RECORDED DATA",
+  "qualityUnknown": "QUALITY UNKNOWN",
+  "replay": "REPLAY:",
+  "authoritativeAlarmUnavailable": "VitalDB does not provide an authoritative alarm feed for this view.",
+  "anesthesiaTypes": {
+    "general": "General"
+  },
+  "clock": "OR TIME",
+  "elapsed": "ELAPSED:",
+  "telOn": "TEL ON",
+  "telDegraded": "TEL WARN",
+  "telOffline": "TEL OFF",
+  "sensors": "SENSORS",
+  "sensorsDegraded": "SIGNAL WARN",
+  "battery": "Battery state",
+  "alerts": "ALERTS",
+  "nav": {
+    "overview": "Overview",
+    "situation": "Situation",
+    "record": "Record",
+    "medications": "Medication",
+    "hemodynamics": "Hemodynamics",
+    "respiratory": "Respiratory"
+  },
+  "navTooltips": {
+    "overview": "Case Overview",
+    "situation": "Perioperative Workflow & Situational Awareness",
+    "record": "Anaesthesia Record Review",
+    "medications": "Medication Safety",
+    "hemodynamics": "Hemodynamic Intelligence",
+    "respiratory": "Respiratory Intelligence"
+  },
+  "lang": {
+    "en": "EN",
+    "vi": "VI",
+    "switchToEn": "Switch to English",
+    "switchToVi": "Chuyển sang Tiếng Việt"
+  }
+}

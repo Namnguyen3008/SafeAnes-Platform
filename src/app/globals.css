@@ -1,0 +1,439 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Canonical SafeAnes Surface & Canvas Tokens */
+    --safe-bg: #02080C;
+    --safe-surface: #07121A;
+    --safe-surface-secondary: #0A1720;
+    --safe-surface-elevated: #0E1E2B;
+
+    /* Canonical SafeAnes Borders & Separators */
+    --safe-border: rgba(45, 155, 215, 0.38);
+    --safe-border-light: rgba(45, 155, 215, 0.20);
+    --safe-border-subtle: rgba(45, 155, 215, 0.10);
+
+    /* Canonical SafeAnes Typography Tokens */
+    --safe-text: #F4F7F8;
+    --safe-text-muted: #A6B2BA;
+    --safe-text-dim: #6C7A84;
+
+    /* Canonical SafeAnes Status Palette */
+    --safe-cyan: #00E5FF;
+    --safe-green: #2AD86A;
+    --safe-yellow: #FFD429;
+    --safe-red: #FF334D;
+    --safe-orange: #F97316;
+    --safe-blue: #2563EB;
+
+    /* Canonical Provenance Tokens (UC02 Standard) */
+    --safe-provenance-direct: #00E5FF;
+    --safe-provenance-derived: #2563EB;
+    --safe-provenance-inferred: #FFD429;
+    --safe-provenance-confirmed: #2AD86A;
+    --safe-provenance-rejected: #FF334D;
+    --safe-provenance-review: #F97316;
+
+    /* Preserved Domain-Specific Clinical Semantics */
+    --safe-etco2: #FFE800;          /* UC05 Capnogram EtCO2 */
+    --safe-spo2: #12B9F2;           /* UC05 Plethysmograph SpO2 */
+    --safe-map: #F5E328;            /* UC04 MAP Yellow */
+    --safe-alert-critical: #FF334D;  /* UC03 Critical Dosing / Allergy */
+    --safe-alert-warning: #FFD429;   /* UC03 Advisory Alert */
+
+    /* Stable semantic aliases. Existing --safe-* names remain supported. */
+    --safe-background-default: var(--safe-bg);
+    --safe-background-surface: var(--safe-surface);
+    --safe-background-elevated: var(--safe-surface-elevated);
+    --safe-border-default: var(--safe-border-light);
+    --safe-border-strong: var(--safe-border);
+    --safe-text-primary: var(--safe-text);
+    --safe-text-secondary: var(--safe-text-muted);
+    --safe-text-tertiary: var(--safe-text-dim);
+    --safe-accent-cyan: var(--safe-cyan);
+    --safe-accent-blue: var(--safe-blue);
+    --safe-semantic-success: var(--safe-green);
+    --safe-semantic-info: var(--safe-cyan);
+    --safe-semantic-warning: var(--safe-yellow);
+    --safe-semantic-high: var(--safe-yellow);
+    --safe-semantic-critical: var(--safe-alert-critical);
+    --safe-quality-good: var(--safe-green);
+    --safe-quality-degraded: var(--safe-yellow);
+    --safe-quality-unavailable: var(--safe-text-dim);
+
+    /* Type roles use the existing workstation scale as their starting point. */
+    --safe-type-app-title-size: 16px;
+    --safe-type-app-title-line-height: 20px;
+    --safe-type-panel-heading-size: 13px;
+    --safe-type-panel-heading-line-height: 16px;
+    --safe-type-section-heading-size: 12px;
+    --safe-type-section-heading-line-height: 16px;
+    --safe-type-body-size: 13px;
+    --safe-type-body-line-height: 18px;
+    --safe-type-secondary-size: 11px;
+    --safe-type-secondary-line-height: 14px;
+    --safe-type-table-header-size: 10px;
+    --safe-type-table-header-line-height: 12px;
+    --safe-type-table-cell-size: 12px;
+    --safe-type-table-cell-line-height: 16px;
+    --safe-type-clinical-large-size: 34px;
+    --safe-type-clinical-large-line-height: 36px;
+    --safe-type-clinical-compact-size: 22px;
+    --safe-type-clinical-compact-line-height: 26px;
+    --safe-type-timestamp-size: 10.5px;
+    --safe-type-timestamp-line-height: 14px;
+    --safe-type-identifier-size: 10px;
+    --safe-type-identifier-line-height: 14px;
+
+    /* Shared density scale and control geometry. */
+    --safe-space-1: 4px;
+    --safe-space-2: 8px;
+    --safe-space-3: 12px;
+    --safe-space-4: 16px;
+    --safe-space-5: 20px;
+    --safe-space-6: 24px;
+    --safe-button-height: 28px;
+    --safe-control-min-width: 80px;
+    --safe-drawer-min-width: 360px;
+    --safe-drawer-preferred-width: 540px;
+    --safe-drawer-max-width: 92vw;
+    --safe-breakpoint-workstation-wide: 1640px;
+    --safe-breakpoint-workstation-compact: 1440px;
+    --safe-breakpoint-workstation-min: 1280px;
+
+    /* Canonical Layout Dimensions */
+    --safe-header-height: 54px;
+    --safe-nav-width: 84px;
+    --safe-panel-gap: 8px;
+    --safe-panel-padding: 12px;
+    --safe-panel-header-height: 30px;
+    --safe-control-height: 28px;
+    --safe-row-height: 32px;
+    --safe-radius: 4px;
+    --safe-radius-none: 0px;
+    --safe-radius-compact: 2px;
+    --safe-radius-tight: 3px;
+    --safe-radius-emphasis: 6px;
+    --safe-separator-width: 1px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    background-color: var(--safe-bg);
+    color: var(--safe-text);
+    font-family: "Inter", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Global Tabular Numerals Enforcement across all clinical readouts */
+  .tabular-nums, .font-mono, th, td, [data-numeric="true"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv01" 1;
+  }
+
+  /* Global Accessible Keyboard Focus Visibility */
+  :focus-visible {
+    outline: 2px solid var(--safe-cyan);
+    outline-offset: 1px;
+  }
+}
+
+/* Custom Clinical Workstation Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--safe-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--safe-surface-elevated);
+  border: 1px solid var(--safe-border);
+  border-radius: var(--safe-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #112838;
+}
+
+/* Canonical Typography Utilities */
+.text-panel-title {
+  font-size: var(--safe-type-panel-heading-size);
+  line-height: var(--safe-type-panel-heading-line-height);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.text-clinical-large {
+  font-size: var(--safe-type-clinical-compact-size);
+  line-height: var(--safe-type-clinical-compact-line-height);
+  font-weight: 700;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-clinical-xlarge {
+  font-size: var(--safe-type-clinical-large-size);
+  line-height: var(--safe-type-clinical-large-line-height);
+  font-weight: 800;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-safe-clinical-numeric-large {
+  font-size: var(--safe-type-clinical-large-size);
+  line-height: var(--safe-type-clinical-large-line-height);
+  font-weight: 800;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-safe-clinical-numeric-compact {
+  font-size: var(--safe-type-clinical-compact-size);
+  line-height: var(--safe-type-clinical-compact-line-height);
+  font-weight: 700;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-safe-app-title {
+  font-size: var(--safe-type-app-title-size);
+  line-height: var(--safe-type-app-title-line-height);
+}
+
+.text-safe-section-heading {
+  font-size: var(--safe-type-section-heading-size);
+  line-height: var(--safe-type-section-heading-line-height);
+}
+
+.text-safe-body {
+  font-size: var(--safe-type-body-size);
+  line-height: var(--safe-type-body-line-height);
+}
+
+.text-safe-secondary {
+  font-size: var(--safe-type-secondary-size);
+  line-height: var(--safe-type-secondary-line-height);
+}
+
+.text-safe-table-header {
+  font-size: var(--safe-type-table-header-size);
+  line-height: var(--safe-type-table-header-line-height);
+}
+
+.text-safe-table-cell {
+  font-size: var(--safe-type-table-cell-size);
+  line-height: var(--safe-type-table-cell-line-height);
+}
+
+.text-safe-timestamp {
+  font-size: var(--safe-type-timestamp-size);
+  line-height: var(--safe-type-timestamp-line-height);
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.text-safe-identifier {
+  font-size: var(--safe-type-identifier-size);
+  line-height: var(--safe-type-identifier-line-height);
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One bounded scroll surface for module workspaces. Dense domain panels may
+   declare a larger minimum canvas when their chart or table needs it. */
+.clinical-module-viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.clinical-workspace-canvas {
+  min-width: 0;
+  min-height: 100%;
+}
+
+.clinical-numeric,
+.clinical-unit,
+.clinical-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.clinical-table-scroll {
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.clinical-table-scroll table {
+  min-width: 100%;
+}
+
+.clinical-table-sticky thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* UC02 keeps the review sequence visible at workstation widths. At compact
+   widths, record and evidence share the right column instead of shrinking. */
+.uc02-review-regions {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(520px, 1.55fr) minmax(380px, 1.2fr);
+  grid-template-areas: "timeline record evidence";
+  gap: var(--safe-panel-gap);
+}
+
+.uc02-review-timeline { grid-area: timeline; }
+.uc02-review-record { grid-area: record; }
+.uc02-review-evidence { grid-area: evidence; }
+
+@media (max-width: 1599px) {
+  .uc02-review-regions {
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 410px);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "timeline record" "timeline evidence";
+  }
+}
+
+.safe-clinical-header {
+  display: grid;
+  height: var(--safe-header-height);
+  min-height: var(--safe-header-height);
+  grid-template-columns: max-content minmax(220px, 1.15fr) minmax(155px, 0.7fr) minmax(190px, 0.9fr) minmax(190px, 0.8fr) minmax(144px, 0.8fr) minmax(260px, 0.9fr) max-content max-content;
+  gap: 4px;
+  align-content: center;
+}
+
+.safe-clinical-header > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.safe-header-patient,
+.safe-header-or,
+.safe-header-anesthesia,
+.safe-header-status { white-space: nowrap; }
+
+@media (max-width: 1639px) {
+  .safe-clinical-header {
+    height: auto;
+    min-height: 76px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    grid-template-columns: minmax(290px, 1.05fr) minmax(220px, 1fr) minmax(150px, 0.68fr) minmax(260px, 0.9fr) minmax(190px, 0.8fr) max-content;
+    grid-template-areas:
+      "brand patient or procedure anesthesia locale"
+      "brand clock clock status alerts locale";
+    row-gap: 4px;
+  }
+
+  .safe-header-brand { grid-area: brand; grid-row: 1 / span 2; }
+  .safe-header-patient { grid-area: patient; }
+  .safe-header-or { grid-area: or; }
+  .safe-header-procedure { grid-area: procedure; }
+  .safe-header-anesthesia { grid-area: anesthesia; }
+  .safe-header-clock { grid-area: clock; }
+  .safe-header-status { grid-area: status; }
+  .safe-header-alerts { grid-area: alerts; }
+  .safe-header-locale { grid-area: locale; }
+  .safe-header-patient,
+  .safe-header-or,
+  .safe-header-anesthesia { min-height: 30px; }
+  .safe-header-procedure { min-height: 30px; }
+  .safe-header-clock,
+  .safe-header-status,
+  .safe-header-alerts { min-height: 32px; }
+}
+
+.safe-tooltip-popover {
+  max-width: min(22rem, calc(100vw - 1rem));
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.simulation-demo-highlight {
+  animation: simulation-demo-highlight-pulse 850ms ease-in-out infinite alternate;
+  box-shadow: inset 0 0 0 2px var(--safe-cyan), 0 0 14px rgba(0, 229, 255, 0.38) !important;
+}
+
+@keyframes simulation-demo-highlight-pulse {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.18); }
+}
+
+/* Clinical workspace height rules keep charts and safety summaries visible
+   without forcing the whole module to a desktop-only fixed height. */
+.uc04-workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, clamp(320px, 24vw, 400px));
+  gap: var(--safe-panel-gap);
+  min-height: 710px;
+}
+
+.uc04-main-workspace {
+  display: grid;
+  grid-template-rows: minmax(180px, 0.29fr) minmax(380px, 0.57fr) minmax(130px, 0.14fr);
+  gap: 10px;
+  min-height: 710px;
+}
+
+.uc04-summary-rail {
+  overflow: visible;
+}
+
+.uc04-risk-card { height: clamp(136px, 17.5vh, 160px); }
+.uc04-map-tile { height: clamp(88px, 12vh, 108px); }
+.uc04-ci-tile { height: clamp(88px, 11.9vh, 107px); }
+.uc04-sv-tile { height: clamp(90px, 12.2vh, 110px); }
+.uc04-forecast-panel { height: clamp(123px, 15.9vh, 143px); }
+.uc04-current-alert { height: clamp(146px, 17.3vh, 156px); }
+.uc04-clinical-value { font-size: clamp(3rem, 6vh, 4rem); }
+.uc04-risk-value { font-size: clamp(3.25rem, 7vh, 4.75rem); }
+
+.uc04-events-panel { min-height: 130px; }
+
+.uc05-workspace-layout {
+  min-height: 700px;
+}
+
+.uc05-visualization-column { min-height: 698px; }
+.uc05-capnogram-panel { height: clamp(148px, 17vh, 170px); }
+.uc05-pleth-panel { height: clamp(112px, 13vh, 135px); }
+.uc05-trend-workspace { height: clamp(220px, 26vh, 280px); }
+.uc05-trend-track-row { height: clamp(42px, 5.4vh, 58px); flex: 0 0 auto; }
+.uc05-bottom-review { min-height: 200px; }
+
+.uc05-summary-rail {
+  gap: 4px;
+  overflow: visible;
+}
+
+.uc05-vital-tile { height: clamp(86px, 11.1vh, 110px); }
+.uc05-risk-card { height: clamp(190px, 23.3vh, 215px); }
+.uc05-current-alert { height: clamp(146px, 18vh, 174px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .simulation-demo-highlight { animation: none; }
+}

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-10",
+  "figmaFile": {
+    "name": "SafeAnes — Unified Clinical Workstation",
+    "url": "https://www.figma.com/design/bAkYMkjbAddPKG70KRzi5K",
+    "fileKey": "bAkYMkjbAddPKG70KRzi5K",
+    "metadataStatus": "HISTORICAL_VERIFIED",
+    "lastRecordedMetadata": {
+      "pageName": "Page 1",
+      "pageNodeId": "0:1",
+      "childCount": 0,
+      "retrievedAt": "2026-10-10"
+    },
+    "currentStateVerified": false
+  },
+  "verifiedNodeIds": [],
+  "verifiedComponents": [],
+  "verifiedVariables": [],
+  "codeConnectMappings": [],
+  "reusableLocalReferences": [
+    {
+      "path": "docs/design/SAFEANES_DESIGN_SYSTEM.md",
+      "scope": "SafeAnes tokens and shared primitive contract"
+    },
+    {
+      "path": "docs/design/SAFEANES_WORKSPACE_DESIGN_PROPOSALS.md",
+      "scope": "Approved local workstation layout proposals"
+    },
+    {
+      "path": "docs/design/TEMPLATE_DISCOVERY.md",
+      "scope": "Prior library search outcomes and evidence limits"
+    },
+    {
+      "path": "docs/design/COMPONENT_REUSE_PLAN.md",
+      "scope": "Existing React component reuse decisions"
+    },
+    {
+      "path": "docs/design/FIGMA_CODE_CONNECT_MAP.md",
+      "scope": "Figma-to-code mapping status"
+    }
+  ],
+  "mcpStatus": {
+    "callsMadeThisTurn": 0,
+    "priorRateLimitEvidence": "Local design notes record a Starter-plan tool-call-limit rejection during prior Figma library/file inventory work.",
+    "retryAfter": null,
+    "retryScheduled": false,
+    "status": "DEFERRED_PENDING_PROVIDER_ACCESS"
+  }
+}

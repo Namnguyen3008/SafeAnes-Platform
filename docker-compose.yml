@@ -1,0 +1,68 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      SAFEANES_ENV: ${SAFEANES_ENV:-local}
+      SAFEANES_APP_MODE: ${SAFEANES_APP_MODE:-VITALDB_REPLAY}
+      SAFEANES_LOG_LEVEL: ${SAFEANES_LOG_LEVEL:-INFO}
+      SAFEANES_RUNTIME_DEVICE: ${SAFEANES_RUNTIME_DEVICE:-cpu}
+      SAFEANES_DATA_ROOT: /app/data
+      SAFEANES_MODEL_ROOT: /models
+      MODEL_REGISTRY_PATH: /app/backend/app/ml/registry/model_registry.json
+      UC04_MODEL_PATH: /models/safeanes_uc04_model/model.pt
+      UC05_MODEL_PATH: /models/safeanes_uc05_respformer_v1/respformer.pt
+      SAFEANES_CORS_ORIGINS: ${SAFEANES_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SAFEANES_ALLOWED_HOSTS: ${SAFEANES_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,backend}
+      SAFEANES_API_TOKEN: ${SAFEANES_API_TOKEN:-}
+      SAFEANES_MAX_SIGNAL_RANGE_SECONDS: ${SAFEANES_MAX_SIGNAL_RANGE_SECONDS:-3600}
+      SAFEANES_MAX_WAVEFORM_RANGE_SECONDS: ${SAFEANES_MAX_WAVEFORM_RANGE_SECONDS:-120}
+      SAFEANES_MAX_SAMPLES: ${SAFEANES_MAX_SAMPLES:-200000}
+      SAFEANES_SIGNAL_FILE_CACHE_ENTRIES: ${SAFEANES_SIGNAL_FILE_CACHE_ENTRIES:-4}
+      SAFEANES_MODEL_SERIES_CACHE_ENTRIES: ${SAFEANES_MODEL_SERIES_CACHE_ENTRIES:-2}
+    volumes:
+      - type: bind
+        source: ${SAFEANES_DATA_HOST_PATH:-./backend/data}
+        target: /app/data
+        read_only: true
+      - type: bind
+        source: ${MODEL_ARTIFACTS_DIR:-../model}
+        target: /models
+        read_only: true
+    ports:
+      - "127.0.0.1:8000:8000"
+    init: true
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: 4.0
+    pids_limit: 256
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 180s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      NODE_ENV: production
+      SAFEANES_API_URL: http://backend:8000
+      SAFEANES_BACKEND_API_TOKEN: ${SAFEANES_API_TOKEN:-}
+    ports:
+      - "127.0.0.1:3000:3000"
+    init: true
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 128
+    depends_on:
+      backend:
+        condition: service_healthy

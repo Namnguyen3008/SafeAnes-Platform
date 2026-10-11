@@ -1,0 +1,39 @@
+{
+  "appName": "SafeAnes",
+  "live": "LIVE",
+  "patient": "PATIENT:",
+  "yearsShort": "y",
+  "female": "Female",
+  "male": "Male",
+  "or": "OR:",
+  "procedure": "PROCEDURE:",
+  "anesthesia": "ANESTHESIA:",
+  "clock": "OR TIME",
+  "elapsed": "ELAPSED:",
+  "telOn": "TEL ON",
+  "sensors": "SENSORS",
+  "battery": "Battery state",
+  "alerts": "ALERTS",
+  "nav": {
+    "overview": "Overview",
+    "situation": "Situation",
+    "record": "Record",
+    "medications": "Medication",
+    "hemodynamics": "Hemodynamics",
+    "respiratory": "Respiratory"
+  },
+  "navTooltips": {
+    "overview": "Clinical Case Overview",
+    "situation": "Perioperative Workflow & Situation Awareness",
+    "record": "Anaesthesia Record Review",
+    "medications": "Medication Safety",
+    "hemodynamics": "Hemodynamic Intelligence",
+    "respiratory": "Respiratory Intelligence"
+  },
+  "lang": {
+    "en": "EN",
+    "vi": "VI",
+    "switchToEn": "Switch to English",
+    "switchToVi": "Chuyển sang Tiếng Việt"
+  }
+}

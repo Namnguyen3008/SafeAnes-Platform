@@ -1,0 +1,3820 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SafeAnes Backend API",
+    "description": "Local API for VitalDB case discovery, observed signals, verified model inference, and replay. Time values are elapsed seconds from the beginning of the case. Model outputs are returned only when the audited model contract permits inference.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Live",
+        "operationId": "live_api_v1_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Ready",
+        "operationId": "ready_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List Models",
+        "operationId": "list_models_api_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models/{model_id}/status": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Model Status",
+        "operationId": "model_status_api_v1_models__model_id__status_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "List Cases",
+        "operationId": "list_cases_api_v1_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CasesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Case Detail",
+        "operationId": "case_detail_api_v1_cases__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/tracks": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Tracks",
+        "operationId": "tracks_api_v1_cases__case_id__tracks_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracksResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/signals": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Signals",
+        "operationId": "signals_api_v1_cases__case_id__signals_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "track_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Track Name"
+            }
+          },
+          {
+            "name": "start_s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "Start S"
+            }
+          },
+          {
+            "name": "end_s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "End S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignalsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/waveforms": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Waveform",
+        "operationId": "waveform_api_v1_cases__case_id__waveforms_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "track_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Track Name"
+            }
+          },
+          {
+            "name": "start_s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "Start S"
+            }
+          },
+          {
+            "name": "end_s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "End S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaveformWindowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/events": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Events",
+        "operationId": "events_api_v1_cases__case_id__events_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/predictions/uc04": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Uc04 Predictions",
+        "operationId": "uc04_predictions_api_v1_cases__case_id__predictions_uc04_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "prediction_time_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Prediction Time S"
+            }
+          },
+          {
+            "name": "as_of_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of S"
+            }
+          },
+          {
+            "name": "window_start_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Window Start S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/predictions/uc04/cache-status": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Uc04 Prediction Cache Status",
+        "operationId": "uc04_prediction_cache_status_api_v1_cases__case_id__predictions_uc04_cache_status_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionCacheStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/uc04-view": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Uc04 View",
+        "operationId": "uc04_view_api_v1_cases__case_id__uc04_view_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "as_of_s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "As Of S"
+            }
+          },
+          {
+            "name": "window_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 1800.0,
+              "title": "Window Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UC04ViewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/predictions/uc05": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Uc05 Predictions",
+        "operationId": "uc05_predictions_api_v1_cases__case_id__predictions_uc05_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "prediction_time_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Prediction Time S"
+            }
+          },
+          {
+            "name": "as_of_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of S"
+            }
+          },
+          {
+            "name": "window_start_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Window Start S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/predictions/uc05/cache-status": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Uc05 Prediction Cache Status",
+        "operationId": "uc05_prediction_cache_status_api_v1_cases__case_id__predictions_uc05_cache_status_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionCacheStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/uc05-view": {
+      "get": {
+        "tags": [
+          "cases",
+          "signals",
+          "inference"
+        ],
+        "summary": "Uc05 View",
+        "operationId": "uc05_view_api_v1_cases__case_id__uc05_view_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "as_of_s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "As Of S"
+            }
+          },
+          {
+            "name": "window_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 1800.0,
+              "title": "Window Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UC05ViewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Create Session",
+        "operationId": "create_session_api_v1_replay_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaySessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Get Session",
+        "operationId": "get_session_api_v1_replay_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/play": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Play",
+        "operationId": "play_api_v1_replay_sessions__session_id__play_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/resume": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Resume",
+        "operationId": "resume_api_v1_replay_sessions__session_id__resume_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/pause": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Pause",
+        "operationId": "pause_api_v1_replay_sessions__session_id__pause_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/reset": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Reset",
+        "operationId": "reset_api_v1_replay_sessions__session_id__reset_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/seek": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Seek",
+        "operationId": "seek_api_v1_replay_sessions__session_id__seek_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaySeekRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/speed": {
+      "post": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Set Speed",
+        "operationId": "set_speed_api_v1_replay_sessions__session_id__speed_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaySpeedRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/replay/sessions/{session_id}/stream": {
+      "get": {
+        "tags": [
+          "replay"
+        ],
+        "summary": "Stream Session",
+        "operationId": "stream_session_api_v1_replay_sessions__session_id__stream_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Structured request or input validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested case, track, session, or model was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Inference or internal processing failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local cache or model runtime is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CaseDetailResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "dataset_version": {
+            "type": "string",
+            "title": "Dataset Version"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Uri"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "patient_context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Patient Context"
+          },
+          "eligibility": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Eligibility"
+          },
+          "available_signals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Signals"
+          },
+          "raw_file": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Raw File"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "dataset",
+          "dataset_version",
+          "source",
+          "duration_seconds",
+          "available_signals"
+        ],
+        "title": "CaseDetailResponse"
+      },
+      "CaseEvent": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "timestamp": {
+            "type": "number",
+            "title": "Timestamp"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "is_missing": {
+            "type": "boolean",
+            "const": false,
+            "title": "Is Missing",
+            "default": false
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "timestamp",
+          "event_type",
+          "description",
+          "source",
+          "quality",
+          "provenance"
+        ],
+        "title": "CaseEvent"
+      },
+      "CaseSummary": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
+          "available_signals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Signals"
+          },
+          "uc04_eligible": {
+            "type": "boolean",
+            "title": "Uc04 Eligible"
+          },
+          "uc05_eligible": {
+            "type": "boolean",
+            "title": "Uc05 Eligible"
+          },
+          "coverage_summary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Coverage Summary"
+          },
+          "number_of_valid_windows": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Number Of Valid Windows"
+          },
+          "inference_readiness": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inference Readiness"
+          },
+          "cache_status": {
+            "type": "string",
+            "title": "Cache Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "duration_seconds",
+          "available_signals",
+          "uc04_eligible",
+          "uc05_eligible",
+          "cache_status"
+        ],
+        "title": "CaseSummary"
+      },
+      "CasesResponse": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "dataset_version": {
+            "type": "string",
+            "title": "Dataset Version"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/CaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset",
+          "dataset_version",
+          "cases"
+        ],
+        "title": "CasesResponse"
+      },
+      "EventsResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "events"
+        ],
+        "title": "EventsResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "service_name": {
+            "type": "string",
+            "const": "safeanes-backend",
+            "title": "Service Name"
+          },
+          "build_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$",
+            "title": "Build Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready"
+          },
+          "components": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Components"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_name",
+          "build_id",
+          "status"
+        ],
+        "title": "HealthResponse"
+      },
+      "InputWindowResponse": {
+        "properties": {
+          "start_time_s": {
+            "type": "number",
+            "title": "Start Time S"
+          },
+          "end_time_s": {
+            "type": "number",
+            "title": "End Time S"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start_time_s",
+          "end_time_s"
+        ],
+        "title": "InputWindowResponse"
+      },
+      "ModelStatusResponse": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "framework": {
+            "type": "string",
+            "title": "Framework"
+          },
+          "artifact_hash": {
+            "type": "string",
+            "title": "Artifact Hash"
+          },
+          "loaded": {
+            "type": "boolean",
+            "title": "Loaded"
+          },
+          "readiness_status": {
+            "type": "string",
+            "title": "Readiness Status"
+          },
+          "inference_ready": {
+            "type": "boolean",
+            "title": "Inference Ready"
+          },
+          "calibration_status": {
+            "type": "string",
+            "title": "Calibration Status"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "model_version",
+          "task",
+          "framework",
+          "artifact_hash",
+          "loaded",
+          "readiness_status",
+          "inference_ready",
+          "calibration_status"
+        ],
+        "title": "ModelStatusResponse"
+      },
+      "ModelsResponse": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelStatusResponse"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "ModelsResponse"
+      },
+      "Observation": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "track_name": {
+            "type": "string",
+            "title": "Track Name"
+          },
+          "timestamp": {
+            "type": "number",
+            "title": "Timestamp"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "is_missing": {
+            "type": "boolean",
+            "title": "Is Missing"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "track_name",
+          "timestamp",
+          "value",
+          "unit",
+          "source",
+          "quality",
+          "is_missing",
+          "provenance"
+        ],
+        "title": "Observation"
+      },
+      "PredictionCacheStatusResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "artifact_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Sha256"
+          },
+          "cache_status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "NOT_READY"
+            ],
+            "title": "Cache Status"
+          },
+          "prediction_count": {
+            "type": "integer",
+            "title": "Prediction Count"
+          },
+          "inference_window_count": {
+            "type": "integer",
+            "title": "Inference Window Count"
+          },
+          "abstained_window_count": {
+            "type": "integer",
+            "title": "Abstained Window Count",
+            "default": 0
+          },
+          "abstained_windows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Abstained Windows"
+          },
+          "window_eligibility": {
+            "type": "string",
+            "title": "Window Eligibility",
+            "default": "NOT_EVALUATED"
+          },
+          "window_status": {
+            "type": "string",
+            "title": "Window Status",
+            "default": "NOT_EVALUATED"
+          },
+          "window_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Reason"
+          },
+          "window_prediction_time_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Prediction Time S"
+          },
+          "window_start_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start S"
+          },
+          "window_end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End S"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "model_id",
+          "cache_status",
+          "prediction_count",
+          "inference_window_count"
+        ],
+        "title": "PredictionCacheStatusResponse"
+      },
+      "PredictionItemResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "prediction_time": {
+            "type": "number",
+            "title": "Prediction Time"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "horizon_if_applicable": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon If Applicable"
+          },
+          "output": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output"
+          },
+          "output_semantics": {
+            "type": "string",
+            "title": "Output Semantics"
+          },
+          "calibration_status": {
+            "type": "string",
+            "title": "Calibration Status"
+          },
+          "data_coverage": {
+            "type": "number",
+            "title": "Data Coverage"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "missing_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Features"
+          },
+          "input_window": {
+            "$ref": "#/components/schemas/InputWindowResponse"
+          },
+          "artifact_hash": {
+            "type": "string",
+            "title": "Artifact Hash"
+          },
+          "preprocessing_version": {
+            "type": "string",
+            "title": "Preprocessing Version"
+          },
+          "source_tracks": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Source Tracks"
+          },
+          "input_window_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Window Start"
+          },
+          "input_window_end": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Window End"
+          },
+          "raw_output": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Output"
+          },
+          "interpreted_output": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpreted Output"
+          },
+          "horizon_minutes_or_null": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Minutes Or Null"
+          },
+          "calibrated_or_not": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibrated Or Not"
+          },
+          "threshold_if_verified": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold If Verified"
+          },
+          "artifact_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Sha256"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "case_id",
+          "model_id",
+          "model_version",
+          "prediction_time",
+          "task",
+          "horizon_if_applicable",
+          "output",
+          "output_semantics",
+          "calibration_status",
+          "data_coverage",
+          "quality",
+          "missing_features",
+          "input_window",
+          "artifact_hash",
+          "preprocessing_version"
+        ],
+        "title": "PredictionItemResponse"
+      },
+      "PredictionsResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "predictions": {
+            "items": {
+              "$ref": "#/components/schemas/PredictionItemResponse"
+            },
+            "type": "array",
+            "title": "Predictions"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "ON_DEMAND",
+              "OFFLINE_CACHE"
+            ],
+            "title": "Source",
+            "default": "ON_DEMAND"
+          },
+          "cache_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "READY",
+                  "NOT_READY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Status"
+          },
+          "as_of_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of S"
+          },
+          "available_horizons_minutes": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Available Horizons Minutes"
+          },
+          "prediction_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prediction Count"
+          },
+          "inference_window_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Window Count"
+          },
+          "abstained_window_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstained Window Count"
+          },
+          "abstained_windows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Abstained Windows"
+          },
+          "window_eligibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Eligibility"
+          },
+          "window_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Status"
+          },
+          "window_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Reason"
+          },
+          "window_prediction_time_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Prediction Time S"
+          },
+          "window_start_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start S"
+          },
+          "window_end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End S"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "model_id",
+          "predictions"
+        ],
+        "title": "PredictionsResponse"
+      },
+      "ReplaySeekRequest": {
+        "properties": {
+          "time_s": {
+            "type": "number",
+            "title": "Time S"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "time_s"
+        ],
+        "title": "ReplaySeekRequest"
+      },
+      "ReplaySessionCreate": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "start_time_s": {
+            "type": "number",
+            "title": "Start Time S",
+            "default": 0.0
+          },
+          "speed": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              5,
+              10,
+              30,
+              60
+            ],
+            "title": "Speed",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id"
+        ],
+        "title": "ReplaySessionCreate"
+      },
+      "ReplaySessionResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "STOPPED",
+              "PLAYING",
+              "PAUSED",
+              "COMPLETED"
+            ],
+            "title": "Status"
+          },
+          "current_time_s": {
+            "type": "number",
+            "title": "Current Time S"
+          },
+          "current_time_seconds": {
+            "type": "number",
+            "title": "Current Time Seconds"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
+          "speed": {
+            "type": "integer",
+            "title": "Speed"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "title": "Created At Utc"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "uc04_model_status": {
+            "type": "string",
+            "title": "Uc04 Model Status"
+          },
+          "uc05_model_status": {
+            "type": "string",
+            "title": "Uc05 Model Status"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "case_id",
+          "status",
+          "current_time_s",
+          "current_time_seconds",
+          "duration_seconds",
+          "speed",
+          "created_at_utc",
+          "started_at",
+          "updated_at",
+          "uc04_model_status",
+          "uc05_model_status"
+        ],
+        "title": "ReplaySessionResponse"
+      },
+      "ReplaySpeedRequest": {
+        "properties": {
+          "speed": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              5,
+              10,
+              30,
+              60
+            ],
+            "title": "Speed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "speed"
+        ],
+        "title": "ReplaySpeedRequest"
+      },
+      "SignalsResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "track_name": {
+            "type": "string",
+            "title": "Track Name"
+          },
+          "track_type": {
+            "type": "string",
+            "title": "Track Type"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "start_time_s": {
+            "type": "number",
+            "title": "Start Time S"
+          },
+          "end_time_s": {
+            "type": "number",
+            "title": "End Time S"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "type": "array",
+            "title": "Observations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "track_name",
+          "track_type",
+          "start_time_s",
+          "end_time_s",
+          "unit",
+          "source",
+          "quality",
+          "provenance",
+          "observations"
+        ],
+        "title": "SignalsResponse"
+      },
+      "TrackMetadata": {
+        "properties": {
+          "track_name": {
+            "type": "string",
+            "title": "Track Name"
+          },
+          "source_device": {
+            "type": "string",
+            "title": "Source Device"
+          },
+          "track_type": {
+            "type": "string",
+            "title": "Track Type"
+          },
+          "native_sample_rate_hz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Native Sample Rate Hz"
+          },
+          "observed_update_rate_hz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Observed Update Rate Hz"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "record_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Record Count"
+          },
+          "native_sample_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Native Sample Count"
+          },
+          "valid_time_range_seconds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Valid Time Range Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "track_name",
+          "source_device",
+          "track_type",
+          "native_sample_rate_hz",
+          "observed_update_rate_hz",
+          "unit",
+          "record_count",
+          "native_sample_count",
+          "valid_time_range_seconds"
+        ],
+        "title": "TrackMetadata"
+      },
+      "TracksResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/TrackMetadata"
+            },
+            "type": "array",
+            "title": "Tracks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "tracks"
+        ],
+        "title": "TracksResponse"
+      },
+      "UC04SignalResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "track_name": {
+            "type": "string",
+            "title": "Track Name"
+          },
+          "track_type": {
+            "type": "string",
+            "title": "Track Type"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "start_time_s": {
+            "type": "number",
+            "title": "Start Time S"
+          },
+          "end_time_s": {
+            "type": "number",
+            "title": "End Time S"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "signal": {
+            "type": "string",
+            "title": "Signal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "track_name",
+          "track_type",
+          "start_time_s",
+          "end_time_s",
+          "unit",
+          "source",
+          "quality",
+          "provenance",
+          "observations",
+          "signal"
+        ],
+        "title": "UC04SignalResponse"
+      },
+      "UC04ViewResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "dataset_version": {
+            "type": "string",
+            "title": "Dataset Version"
+          },
+          "as_of_s": {
+            "type": "number",
+            "title": "As Of S"
+          },
+          "window_start_s": {
+            "type": "number",
+            "title": "Window Start S"
+          },
+          "window_end_s": {
+            "type": "number",
+            "title": "Window End S"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "available_tracks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Tracks"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/UC04SignalResponse"
+            },
+            "type": "array",
+            "title": "Signals"
+          },
+          "abp_waveform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaveformWindowResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "predictions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictionsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prediction_cache_status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "NOT_READY"
+            ],
+            "title": "Prediction Cache Status"
+          },
+          "prediction_cache": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictionCacheStatusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "dataset",
+          "dataset_version",
+          "as_of_s",
+          "window_start_s",
+          "window_end_s",
+          "available_tracks",
+          "signals",
+          "events",
+          "prediction_cache_status"
+        ],
+        "title": "UC04ViewResponse"
+      },
+      "UC05ViewResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "dataset_version": {
+            "type": "string",
+            "title": "Dataset Version"
+          },
+          "as_of_s": {
+            "type": "number",
+            "title": "As Of S"
+          },
+          "window_start_s": {
+            "type": "number",
+            "title": "Window Start S"
+          },
+          "window_end_s": {
+            "type": "number",
+            "title": "Window End S"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "available_tracks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Tracks"
+          },
+          "signals": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Signals"
+          },
+          "waveforms": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/WaveformWindowResponse"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Waveforms"
+          },
+          "recorded_events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Recorded Events"
+          },
+          "derived_events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Derived Events"
+          },
+          "predictions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictionsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prediction_cache_status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "NOT_READY"
+            ],
+            "title": "Prediction Cache Status"
+          },
+          "prediction_cache": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictionCacheStatusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "dataset",
+          "dataset_version",
+          "as_of_s",
+          "window_start_s",
+          "window_end_s",
+          "available_tracks",
+          "signals",
+          "waveforms",
+          "recorded_events",
+          "derived_events",
+          "prediction_cache_status",
+          "model"
+        ],
+        "title": "UC05ViewResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WaveformWindowResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "track_name": {
+            "type": "string",
+            "title": "Track Name"
+          },
+          "track_type": {
+            "type": "string",
+            "const": "WAVEFORM",
+            "title": "Track Type",
+            "default": "WAVEFORM"
+          },
+          "time_basis": {
+            "type": "string",
+            "const": "seconds_since_case_start",
+            "title": "Time Basis",
+            "default": "seconds_since_case_start"
+          },
+          "start_time_s": {
+            "type": "number",
+            "title": "Start Time S"
+          },
+          "end_time_s": {
+            "type": "number",
+            "title": "End Time S"
+          },
+          "sample_rate_hz": {
+            "type": "number",
+            "title": "Sample Rate Hz"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "display_range": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Range"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "timestamps": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Timestamps"
+          },
+          "values": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "is_missing": {
+            "items": {
+              "type": "boolean"
+            },
+            "type": "array",
+            "title": "Is Missing"
+          },
+          "missing_intervals": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Missing Intervals"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "track_name",
+          "start_time_s",
+          "end_time_s",
+          "sample_rate_hz",
+          "unit",
+          "source",
+          "quality",
+          "timestamps",
+          "values",
+          "is_missing",
+          "missing_intervals",
+          "provenance"
+        ],
+        "title": "WaveformWindowResponse"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      }
+    }
+  }
+}

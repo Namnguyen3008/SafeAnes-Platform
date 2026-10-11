@@ -1,0 +1,39 @@
+{
+  "appName": "SafeAnes",
+  "live": "TRỰC TIẾP",
+  "patient": "BỆNH NHÂN:",
+  "yearsShort": "tuổi",
+  "female": "Nữ",
+  "male": "Nam",
+  "or": "OR:",
+  "procedure": "PHẪU THUẬT:",
+  "anesthesia": "GÂY MÊ:",
+  "clock": "GIỜ PHÒNG MỔ",
+  "elapsed": "THỜI GIAN:",
+  "telOn": "TEL BẬT",
+  "sensors": "CẢM BIẾN",
+  "battery": "Trạng thái pin",
+  "alerts": "CẢNH BÁO",
+  "nav": {
+    "overview": "Tổng quan",
+    "situation": "Tình huống",
+    "record": "Hồ sơ",
+    "medications": "Thuốc",
+    "hemodynamics": "Huyết động",
+    "respiratory": "Hô hấp"
+  },
+  "navTooltips": {
+    "overview": "Tổng quan ca mổ",
+    "situation": "Quy trình chu phẫu & Nhận thức tình huống",
+    "record": "Duyệt hồ sơ gây mê",
+    "medications": "An toàn dùng thuốc",
+    "hemodynamics": "Phân tích huyết động",
+    "respiratory": "Phân tích hô hấp"
+  },
+  "lang": {
+    "en": "EN",
+    "vi": "VI",
+    "switchToEn": "Chuyển sang Tiếng Anh",
+    "switchToVi": "Chuyển sang Tiếng Việt"
+  }
+}

@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: safeanes-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    region: singapore
+    plan: standard
+    healthCheckPath: /api/v1/health/live
+    autoDeploy: true
+    envVars:
+      - key: SAFEANES_ENV
+        value: production
+      - key: SAFEANES_APP_MODE
+        value: VITALDB_REPLAY
+      - key: SAFEANES_RUNTIME_DEVICE
+        value: cpu
+      - key: SAFEANES_DATA_ROOT
+        value: /app/data
+      - key: SAFEANES_MODEL_ROOT
+        value: /app/models
+      - key: SAFEANES_CORS_ORIGINS
+        value: "https://safeanes.vercel.app,http://localhost:3000"
+      - key: SAFEANES_ALLOWED_HOSTS
+        value: "*"
+      - key: SAFEANES_API_TOKEN
+        generateValue: true
+      - key: SAFEANES_MAX_SIGNAL_RANGE_SECONDS
+        value: "3600"
+      - key: SAFEANES_MAX_WAVEFORM_RANGE_SECONDS
+        value: "120"
+      - key: SAFEANES_MAX_SAMPLES
+        value: "200000"
+      - key: SAFEANES_SIGNAL_FILE_CACHE_ENTRIES
+        value: "24"
+      - key: SAFEANES_MODEL_SERIES_CACHE_ENTRIES
+        value: "2"
+      - key: SAFEANES_PREDICTION_CACHE_ENTRIES
+        value: "2"
+      - key: DATABASE_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-southeast-1
+      - key: AWS_S3_BUCKET_MODELS
+        value: safeanes-models
