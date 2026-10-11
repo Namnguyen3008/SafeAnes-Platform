@@ -76,7 +76,7 @@ class VitalDBRepository:
                     try:
                         import urllib.request
                         raw_path.parent.mkdir(parents=True, exist_ok=True)
-                        download_url = f"https://api.vitaldb.net/{normalized}.vital"
+                        download_url = manifest.get("source_uri") or f"https://api.vitaldb.net/1.0.1/{normalized}.vital"
                         urllib.request.urlretrieve(download_url, str(raw_path))
                     except Exception as exc:
                         raise ApiServiceError(

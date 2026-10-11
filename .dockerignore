@@ -10,9 +10,14 @@ coverage
 **/*.py[cod]
 backend/data/vitaldb/raw
 backend/data/vitaldb/cache
-backend/data/vitaldb/processed
+!backend/data/processed
+!backend/data/processed/**
+!backend/data/vitaldb/processed
+!backend/data/vitaldb/processed/**
 !backend/data/manifests
+!backend/data/manifests/**
 !backend/data/vitaldb/manifests
+!backend/data/vitaldb/manifests/**
 data
 model
 models
