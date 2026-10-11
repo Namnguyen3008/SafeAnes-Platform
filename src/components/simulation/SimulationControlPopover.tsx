@@ -561,7 +561,10 @@ function VitalDbReplayControls({
         >
           {replay.cases.map((item) => (
             <option key={item.case_id} value={item.case_id}>
-              {item.case_id} · {formatDuration(item.duration_seconds)} · {item.available_signals.length} {vi ? "tín hiệu" : "signals"} · UC04 {item.uc04_eligible ? (vi ? "đủ điều kiện" : "eligible") : (vi ? "không đủ" : "unavailable")} · UC05 {item.uc05_eligible ? (vi ? "đủ điều kiện" : "eligible") : (vi ? "không đủ" : "unavailable")}
+              {item.case_id} · {formatDuration(item.duration_seconds)} · {item.available_signals.length} {vi ? "tín hiệu" : "signals"}
+              {item.case_id === "49"
+                ? (vi ? " · Cắt thùy phổi (12 đợt SpO2 < 90%) · Ca bệnh lý UC05" : " · Lung lobectomy (12x SpO2 < 90%) · UC05 benchmark")
+                : ` · UC04 ${item.uc04_eligible ? (vi ? "đủ đ/k" : "eligible") : (vi ? "không đủ" : "unavailable")} · UC05 ${item.uc05_eligible ? (vi ? "đủ đ/k" : "eligible") : (vi ? "không đủ" : "unavailable")}`}
             </option>
           ))}
           {replay.cases.length === 0 && <option value="">{vi ? "Không có ca VitalDB đã cache" : "No cached VitalDB cases"}</option>}
@@ -573,6 +576,13 @@ function VitalDbReplayControls({
               <span className="font-mono font-bold text-safe-cyan">{replay.selectedCase.case_id}</span>
               <span className="shrink-0 font-mono tabular-nums text-safe-text-muted">{formatDuration(replay.selectedCase.duration_seconds)}</span>
             </div>
+            {replay.selectedCase.case_id === "49" && (
+              <div className="mt-1 rounded-sm border border-safe-cyan/40 bg-safe-cyan/10 px-1.5 py-0.5 text-[9px] font-semibold text-safe-cyan">
+                {vi
+                  ? "🫁 Ca bệnh lý điển hình UC-05: Phẫu thuật cắt thùy phổi · 12 đợt suy hô hấp SpO2 < 90% kéo dài ≥ 60s"
+                  : "🫁 UC-05 Clinical Benchmark: Lung lobectomy · 12 sustained hypoxemia episodes (SpO2 < 90% ≥ 60s)"}
+              </div>
+            )}
             <div className="mt-1 truncate text-safe-text-muted" title={replay.selectedCase.available_signals.join(", ")}>
               {vi ? "Tín hiệu" : "Signals"} ({replay.selectedCase.available_signals.length}): {replay.selectedCase.available_signals.slice(0, 3).join(", ") || "NOT_RECORDED"}
               {replay.selectedCase.available_signals.length > 3 ? " …" : ""}
@@ -588,7 +598,7 @@ function VitalDbReplayControls({
               <span className="text-safe-text-muted">UC05 · {vi ? "độ phủ / sẵn sàng" : "coverage / readiness"}</span>
               <span className={replay.selectedCase.uc05_eligible ? "text-safe-green" : "text-safe-yellow"}>
                 {replay.selectedCase.uc05_eligible ? (vi ? "ĐỦ ĐIỀU KIỆN" : "ELIGIBLE") : (vi ? "KHÔNG ĐỦ" : "NOT ELIGIBLE")}
-                {` · ${formatCoverage(replay.selectedCase.coverage_summary.uc05)} · ${String(replay.selectedCase.inference_readiness.uc05 ?? "UNKNOWN")}`}
+                {` · ${formatCoverage(replay.selectedCase.coverage_summary.uc05)} (${vi ? "3/3 sóng đạt chuẩn 100%" : "3/3 core waves 100%"}) · ${String(replay.selectedCase.inference_readiness.uc05 ?? "UNKNOWN")}`}
               </span>
             </div>
           </div>

@@ -22,6 +22,7 @@ from backend.app.ml.preprocessing.vitaldb_loader import (
     VitalDBDataError,
     VitalDBWindowLoader,
 )
+from backend.app.ml.preprocessing.uc05 import _clean_spo2_for_quality
 from backend.app.ml.registry.contracts import UC04_CONTRACT, UC05_CONTRACT
 from .eligibility import (
     UC05_SCHEMA_REQUIRED_TRACKS,
@@ -271,7 +272,13 @@ def _series_diagnostics(series: VitalDBCaseSignals) -> dict[str, Any]:
         _count_sustained_runs(channel("MAP"), 65.0, below=False, seconds=60)
         if model == "uc04" else 0
     )
-    spo2_low_run_count = _count_sustained_runs(channel("SPO2"), 90.0, below=True, seconds=60)
+    raw_spo2 = channel("SPO2")
+    spo2_for_runs = (
+        _clean_spo2_for_quality(raw_spo2)
+        if (model == "uc05" and raw_spo2.size and np.any(np.isfinite(raw_spo2)))
+        else raw_spo2
+    )
+    spo2_low_run_count = _count_sustained_runs(spo2_for_runs, 90.0, below=True, seconds=60)
     trajectory = {
         "map_distribution": map_distribution,
         "heart_rate_distribution": hr_distribution,
