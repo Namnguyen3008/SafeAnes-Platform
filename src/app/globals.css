@@ -403,12 +403,12 @@
   overflow: visible;
 }
 
-.uc04-risk-card { height: clamp(136px, 17.5vh, 160px); }
-.uc04-map-tile { height: clamp(88px, 12vh, 108px); }
-.uc04-ci-tile { height: clamp(88px, 11.9vh, 107px); }
-.uc04-sv-tile { height: clamp(90px, 12.2vh, 110px); }
-.uc04-forecast-panel { height: clamp(123px, 15.9vh, 143px); }
-.uc04-current-alert { height: clamp(146px, 17.3vh, 156px); }
+.uc04-risk-card { height: clamp(120px, 15vh, 145px); }
+.uc04-map-tile { height: clamp(80px, 10.5vh, 98px); }
+.uc04-ci-tile { height: clamp(76px, 10vh, 92px); }
+.uc04-sv-tile { height: clamp(76px, 10vh, 92px); }
+.uc04-forecast-panel { min-height: 165px; height: clamp(165px, 21vh, 205px); }
+.uc04-current-alert { min-height: 44px; }
 .uc04-clinical-value { font-size: clamp(3rem, 6vh, 4rem); }
 .uc04-risk-value { font-size: clamp(3.25rem, 7vh, 4.75rem); }
 

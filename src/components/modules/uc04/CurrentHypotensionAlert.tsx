@@ -33,22 +33,26 @@ export function CurrentHypotensionAlert() {
             setIsAlertDialogOpen(true);
           }
         }}
-        className="uc04-current-alert shrink-0 min-w-0 bg-[#0A131B] border rounded-[3px] p-3 flex items-center gap-3.5 overflow-hidden select-none transition-colors focus:outline-none focus:ring-1 focus:ring-[#00C5FF]"
+        className={`uc04-current-alert shrink-0 min-w-0 bg-[#0A131B] border rounded-[3px] ${
+          noAlert ? "p-2 min-h-[44px] gap-2.5" : "p-3 gap-3.5"
+        } flex items-center overflow-hidden select-none transition-colors focus:outline-none focus:ring-1 focus:ring-[#00C5FF]`}
         style={{ borderColor: color }}
       >
-        <AlertTriangle className="w-12 h-12 shrink-0" style={{ color }} />
+        <AlertTriangle className={`${noAlert ? "w-5 h-5" : "w-10 h-10"} shrink-0`} style={{ color }} />
         <div className="min-w-0 flex flex-col justify-center">
-          <span className="text-[11px] font-mono font-extrabold uppercase" style={{ color }}>
+          <span className={`${noAlert ? "text-[9px]" : "text-[11px]"} font-mono font-extrabold uppercase leading-none`} style={{ color }}>
             {noAlert ? isVitalDb ? t("vitaldb.recordedDataLabel") : t("simulation.demoOnly")
               : resolved ? t("simulation.alertResolved") : t("simulation.demoOnly")}
           </span>
-          <span className="text-[16px] font-bold text-[#F4F6F7] leading-snug break-words">
+          <span className={`${noAlert ? "text-[12px] leading-tight" : "text-[16px] leading-snug"} font-bold text-[#F4F6F7] break-words`}>
             {activeAlert ? t("simulation.alertTitle")
               : isVitalDb ? t("vitaldb.noModelAlertTitle") : t("simulation.noActiveAlert")}
           </span>
-          <p className="text-[11px] text-[#AAB4BB] mt-1 font-medium leading-snug">
-            {subtitle}{!noAlert && <> · {t("simulation.clickForDetails")}</>}
-          </p>
+          {!noAlert && (
+            <p className="text-[11px] text-[#AAB4BB] mt-1 font-medium leading-snug">
+              {subtitle} · {t("simulation.clickForDetails")}
+            </p>
+          )}
         </div>
       </div>
       <AlertDialog isOpen={!noAlert && isAlertDialogOpen} onClose={() => setIsAlertDialogOpen(false)} />
