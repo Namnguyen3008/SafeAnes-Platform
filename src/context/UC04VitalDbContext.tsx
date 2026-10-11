@@ -276,13 +276,11 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
         setError("No locally cached VitalDB case is available.");
         return;
       }
+      persistDataSourceMode(window.sessionStorage, nextMode);
+      setModeState(nextMode);
       setIsLoading(true);
       try {
         await createOrRestoreSession(selectedCaseId);
-        if (sessionRef.current?.case_id === selectedCaseId) {
-          persistDataSourceMode(window.sessionStorage, nextMode);
-          setModeState(nextMode);
-        }
       } catch (cause) {
         setError(errorText(cause));
       } finally {

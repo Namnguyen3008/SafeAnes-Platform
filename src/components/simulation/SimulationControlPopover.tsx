@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, ChevronDown, Pause, Play, RotateCcw } from "lucide-react";
+import { Activity, ChevronDown, Loader2, Pause, Play, RotateCcw } from "lucide-react";
 import { useSimulationReplay } from "@/context/SimulationReplayContext";
 import { useTranslation } from "@/context/LocalizationContext";
 import { useSafeAnesData } from "@/context/UC04VitalDbContext";
@@ -241,16 +241,29 @@ export function SimulationControlPopover() {
             <label htmlFor="safeanes-replay-source" className="text-[10px] font-semibold uppercase tracking-wide text-safe-text-muted">
               {locale === "vi" ? "Nguồn dữ liệu" : "Data source"}
             </label>
-            <select
-              id="safeanes-replay-source"
-              value={vitalDb.mode}
-              onChange={(event) => { void vitalDb.setMode(event.target.value as "SYNTHETIC_DEMO" | "VITALDB_REPLAY"); }}
-              disabled={vitalDb.isLoading}
-              className="h-7 min-w-0 rounded-sm border border-safe-border bg-safe-bg px-2 text-[10px] font-semibold text-safe-text outline-none focus-visible:ring-2 focus-visible:ring-safe-cyan disabled:opacity-60"
-            >
-              <option value="SYNTHETIC_DEMO">{locale === "vi" ? "Mô phỏng tổng hợp" : "Synthetic demo"}</option>
-              <option value="VITALDB_REPLAY">VitalDB · {locale === "vi" ? "phát lại hồi cứu" : "retrospective replay"}</option>
-            </select>
+            <div className="min-w-0">
+              <select
+                id="safeanes-replay-source"
+                value={vitalDb.mode}
+                onChange={(event) => { void vitalDb.setMode(event.target.value as "SYNTHETIC_DEMO" | "VITALDB_REPLAY"); }}
+                disabled={vitalDb.isLoading}
+                className="h-7 w-full min-w-0 rounded-sm border border-safe-border bg-safe-bg px-2 text-[10px] font-semibold text-safe-text outline-none focus-visible:ring-2 focus-visible:ring-safe-cyan disabled:opacity-60"
+              >
+                <option value="SYNTHETIC_DEMO">{locale === "vi" ? "Mô phỏng tổng hợp" : "Synthetic demo"}</option>
+                <option value="VITALDB_REPLAY">VitalDB · {locale === "vi" ? "phát lại hồi cứu" : "retrospective replay"}</option>
+              </select>
+              {vitalDb.isLoading && (
+                <div className="mt-1 flex items-center gap-1.5 text-[10px] text-safe-cyan">
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                  <span>{locale === "vi" ? "Đang đồng bộ phiên VitalDB..." : "Connecting VitalDB session..."}</span>
+                </div>
+              )}
+              {vitalDb.error && (
+                <p role="status" className="mt-1 break-words text-[10px] text-safe-red">
+                  {vitalDb.error}
+                </p>
+              )}
+            </div>
           </div>
           {vitalDb.mode === "VITALDB_REPLAY" ? (
             <VitalDbReplayControls locale={locale} replay={vitalDb} />
