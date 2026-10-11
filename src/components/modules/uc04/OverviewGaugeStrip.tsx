@@ -5,7 +5,7 @@ import { CircularMetricGauge } from "./CircularMetricGauge";
 import { useHemodynamic } from "@/context/HemodynamicContext";
 import { useSafeAnesData } from "@/context/UC04VitalDbContext";
 import { useTranslation } from "@/context/LocalizationContext";
-import { formatModelOutput } from "@/lib/formatModelOutput";
+import { formatModelOutput, formatModelPercent } from "@/lib/formatModelOutput";
 import { modelOutputStateMessageKey, projectModelOutputState } from "@/lib/modelOutputStatus";
 
 export function OverviewGaugeStrip() {
@@ -36,7 +36,7 @@ export function OverviewGaugeStrip() {
               : modelStateLabel
             : t("gauge.predictiveRisk")}
           value={isVitalDb ? score === null ? "—" : formatModelOutput(score) : vitals.hpi ?? "--"}
-          unit={isVitalDb ? t("vitaldb.scoreUnit") : "/100"}
+          unit={isVitalDb ? (score !== null && formatModelPercent(score) ? `${formatModelPercent(score)} · ${t("vitaldb.scoreUnit")}` : t("vitaldb.scoreUnit")) : "/100"}
           themeColor={isVitalDb ? "#B392F0" : "#FF3348"}
           valueColor={isVitalDb ? "#B392F0" : "#FF3348"}
           topInnerLabel={isVitalDb ? "MODEL" : "50"}

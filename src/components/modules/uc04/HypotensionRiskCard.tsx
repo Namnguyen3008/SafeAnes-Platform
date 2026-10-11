@@ -7,7 +7,7 @@ import { useSafeAnesData } from "@/context/UC04VitalDbContext";
 import { useTranslation } from "@/context/LocalizationContext";
 import { HpiDetailPopover } from "./ui/Popover";
 import { valuesToPath } from "./visualization/svgPaths";
-import { formatModelOutput } from "@/lib/formatModelOutput";
+import { formatModelOutput, formatModelPercent } from "@/lib/formatModelOutput";
 import { modelOutputStateMessageKey, projectModelOutputState } from "@/lib/modelOutputStatus";
 
 export function HypotensionRiskCard() {
@@ -79,13 +79,20 @@ export function HypotensionRiskCard() {
 
         {/* Main Readout and Risk Sparkline */}
         <div className="flex items-center justify-between px-1">
-          <div className="flex items-baseline">
-            <span className="uc04-risk-value font-black font-mono leading-none tabular-nums tracking-tighter" style={{ color: riskColor }}>
-              {isVitalDb ? modelProjection.state === "READY" && risk !== null ? formatModelOutput(risk) : "—" : vitals.hpi ?? "--"}
-            </span>
-            <span className={`${isVitalDb ? "text-[11px]" : "text-[20px]"} font-semibold font-mono text-safe-text-muted ml-1`}>
-              {isVitalDb ? modelProjection.state === "READY" ? t("vitaldb.scoreUnit") : "" : "/100"}
-            </span>
+          <div className="flex flex-col justify-center">
+            <div className="flex items-baseline">
+              <span className="uc04-risk-value font-black font-mono leading-none tabular-nums tracking-tighter" style={{ color: riskColor }}>
+                {isVitalDb ? modelProjection.state === "READY" && risk !== null ? formatModelOutput(risk) : "—" : vitals.hpi ?? "--"}
+              </span>
+              <span className={`${isVitalDb ? "text-[11px]" : "text-[20px]"} font-semibold font-mono text-safe-text-muted ml-1`}>
+                {isVitalDb ? modelProjection.state === "READY" ? t("vitaldb.scoreUnit") : "" : "/100"}
+              </span>
+            </div>
+            {isVitalDb && modelProjection.state === "READY" && risk !== null && formatModelPercent(risk) && (
+              <div className="text-[14px] font-mono font-bold text-[#00E5FF] tabular-nums mt-0.5">
+                ≈ {formatModelPercent(risk)}
+              </div>
+            )}
           </div>
 
           {/* Upward red risk sparkline */}

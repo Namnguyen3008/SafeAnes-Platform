@@ -5,7 +5,7 @@ import { Heart, Info, Bell, ChevronRight, Check } from "lucide-react";
 import { useTrendSync } from "@/context/RespiratoryContext";
 import { useSafeAnesData } from "@/context/UC04VitalDbContext";
 import { useTranslation } from "@/context/LocalizationContext";
-import { formatModelOutput } from "@/lib/formatModelOutput";
+import { formatModelOutput, formatModelPercent } from "@/lib/formatModelOutput";
 import { modelOutputStateMessageKey, projectModelOutputState } from "@/lib/modelOutputStatus";
 import {
   RespiratoryVitals,
@@ -248,10 +248,17 @@ export function RespiratoryRiskCard({
         {modelState.state === "READY" ? (
           <div className="grid grid-cols-3 gap-2">
             {primary.map((row) => (
-              <div key={`${row.predictionTime}-${row.horizonMinutes}`} className="min-w-0 border border-[rgba(80,160,210,0.3)] bg-[#09151D] px-2 py-1.5 text-center">
-                <div className="text-[10px] text-[#A7B0B6]">{row.horizonMinutes} {t("vitalDb.minuteShort")}</div>
-                <div className="font-mono text-[18px] font-semibold tabular-nums text-[#12B9F2]">{formatModelOutput(row.value)}</div>
-                <div className="break-words text-[9px] leading-tight text-[#A7B0B6]">
+              <div key={`${row.predictionTime}-${row.horizonMinutes}`} className="min-w-0 border border-[rgba(80,160,210,0.3)] bg-[#09151D] px-1.5 py-1.5 text-center flex flex-col justify-between">
+                <div className="text-[10px] text-[#A7B0B6] leading-none">{row.horizonMinutes} {t("vitalDb.minuteShort")}</div>
+                <div className="my-1 flex flex-col items-center">
+                  <div className="font-mono text-[16px] font-semibold tabular-nums text-[#12B9F2] leading-none">{formatModelOutput(row.value)}</div>
+                  {formatModelPercent(row.value) && (
+                    <div className="font-mono text-[11px] font-bold tabular-nums text-[#00E5FF] mt-0.5 leading-none">
+                      {formatModelPercent(row.value)}
+                    </div>
+                  )}
+                </div>
+                <div className="break-words text-[8.5px] leading-tight text-[#A7B0B6]">
                   {row.calibrated ? t("vitalDb.temperatureScaledOutput") : t("vitalDb.uncalibratedOutput")}
                 </div>
               </div>

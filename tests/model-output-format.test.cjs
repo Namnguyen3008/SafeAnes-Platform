@@ -17,7 +17,7 @@ require.extensions[".ts"] = (module, filename) => {
   module._compile(outputText, filename);
 };
 
-const { formatModelOutput } = require(path.join(__dirname, "..", "src", "lib", "formatModelOutput.ts"));
+const { formatModelOutput, formatModelPercent } = require(path.join(__dirname, "..", "src", "lib", "formatModelOutput.ts"));
 const { classifyModelOutputState } = require(path.join(__dirname, "..", "src", "lib", "modelOutputStatus.ts"));
 
 test("UC05 recorded model outputs use precision-preserving formatting", () => {
@@ -33,6 +33,18 @@ test("model output formatter preserves small nonzero values and significant digi
   assert.equal(formatModelOutput(-4.38626337), "-4.386");
   assert.equal(formatModelOutput(0), "0");
   assert.equal(formatModelOutput(Number.NaN), "NOT_AVAILABLE");
+});
+
+test("model percent formatter outputs readable percentages for probability and score outputs", () => {
+  assert.equal(formatModelPercent(0.4166), "41.7%");
+  assert.equal(formatModelPercent(0.0883), "8.8%");
+  assert.equal(formatModelPercent(0.005), "0.50%");
+  assert.equal(formatModelPercent(0.000002079), "0.00021%");
+  assert.equal(formatModelPercent(0), "0%");
+  assert.equal(formatModelPercent(1), "100.0%");
+  assert.equal(formatModelPercent(-4.386), null);
+  assert.equal(formatModelPercent(Number.NaN), null);
+  assert.equal(formatModelPercent(null), null);
 });
 
 test("recorded model output state distinguishes loading, blocked, abstained, missing and ready", () => {

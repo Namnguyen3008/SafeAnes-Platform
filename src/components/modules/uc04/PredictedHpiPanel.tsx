@@ -6,7 +6,7 @@ import { useHemodynamic } from "@/context/HemodynamicContext";
 import { useSafeAnesData } from "@/context/UC04VitalDbContext";
 import { useTranslation } from "@/context/LocalizationContext";
 import { modelOutputStateMessageKey, projectModelOutputState } from "@/lib/modelOutputStatus";
-import { formatModelOutput } from "@/lib/formatModelOutput";
+import { formatModelOutput, formatModelPercent } from "@/lib/formatModelOutput";
 
 export function PredictedHpiPanel() {
   const { forecastHorizons, prediction, dataSourceMode } = useHemodynamic();
@@ -56,14 +56,21 @@ export function PredictedHpiPanel() {
           <>
             <div className={`grid ${forecastHorizons.length > 1 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"} min-w-0 gap-2 py-1 text-center`}>
               {forecastHorizons.map((f) => (
-                <div key={f.minute} className="min-w-0 bg-[#0A131B] border border-[rgba(100,170,210,0.2)] rounded-[3px] p-1.5">
-                  <div className="text-[11px] text-[#AAB4BB]">
+                <div key={f.minute} className="min-w-0 bg-[#0A131B] border border-[rgba(100,170,210,0.2)] rounded-[3px] p-1.5 flex flex-col justify-between">
+                  <div className="text-[11px] text-[#AAB4BB] leading-none">
                     {f.minute} {t("vitaldb.minuteShort")}
                   </div>
-                  <div className="text-[clamp(1.25rem,1.5vw,1.8rem)] font-black font-mono mt-0.5 tabular-nums leading-none text-[#B392F0]">
-                    {f.outputValue === null || f.outputValue === undefined ? "—" : formatModelOutput(f.outputValue)}
+                  <div className="my-1 flex flex-col items-center">
+                    <div className="text-[clamp(1.1rem,1.35vw,1.6rem)] font-black font-mono tabular-nums leading-none text-[#B392F0]">
+                      {f.outputValue === null || f.outputValue === undefined ? "—" : formatModelOutput(f.outputValue)}
+                    </div>
+                    {f.outputValue !== null && f.outputValue !== undefined && formatModelPercent(f.outputValue) && (
+                      <div className="text-[11px] font-mono font-bold tabular-nums text-[#00E5FF] mt-0.5 leading-none">
+                        {formatModelPercent(f.outputValue)}
+                      </div>
+                    )}
                   </div>
-                  <div className="break-words text-[9px] leading-tight text-[#AAB4BB]">
+                  <div className="break-words text-[8.5px] leading-tight text-[#AAB4BB]">
                     {calibrationLabel} · {prediction.outputSemantics ?? "NOT_RECORDED"}
                   </div>
                 </div>

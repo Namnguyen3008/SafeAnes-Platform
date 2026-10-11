@@ -5,7 +5,7 @@ import { X, ShieldAlert, Cpu } from "lucide-react";
 import { useHemodynamic } from "@/context/HemodynamicContext";
 import { useSafeAnesData } from "@/context/UC04VitalDbContext";
 import { useTranslation } from "@/context/LocalizationContext";
-import { formatModelOutput } from "@/lib/formatModelOutput";
+import { formatModelOutput, formatModelPercent } from "@/lib/formatModelOutput";
 import { modelOutputStateMessageKey, projectModelOutputState } from "@/lib/modelOutputStatus";
 
 export interface HpiDetailPopoverProps {
@@ -82,7 +82,7 @@ export function HpiDetailPopover({ isOpen, onClose }: HpiDetailPopoverProps) {
         {isVitalDb && <div className="flex justify-between items-center border-b border-[rgba(100,170,210,0.12)] pb-1">
           <span className="text-[#AAB4BB]">{t("vitaldb.modelOutput")}</span>
           <span className="font-mono font-bold text-[#B392F0]">
-            {isRecordedReady && prediction.outputValue != null ? formatModelOutput(prediction.outputValue) : "—"}
+            {isRecordedReady && prediction.outputValue != null ? `${formatModelOutput(prediction.outputValue)}${formatModelPercent(prediction.outputValue) ? ` (${formatModelPercent(prediction.outputValue)})` : ""}` : "—"}
           </span>
         </div>}
 
