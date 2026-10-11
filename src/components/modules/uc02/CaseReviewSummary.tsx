@@ -96,74 +96,52 @@ export function CaseReviewSummary() {
 
   return (
     <section className="w-full flex gap-2 h-[142px] shrink-0 select-none">
-      {/* Left 6-Card Metric Row (~65% width) */}
-      <div className="flex-1 grid grid-cols-6 gap-2">
-        {kpiMetrics.map((m) => (
-          <div
-            key={m.id}
-            className="bg-safe-surface border border-safe-border rounded-[2px] p-2 flex flex-col justify-between relative overflow-hidden"
-          >
-            {/* Header label & unit */}
-            <div className="text-center">
-              <div className="min-h-[2.25em] text-[10px] font-bold text-safe-text tracking-wide leading-tight uppercase whitespace-normal break-words">
-                {m.label}
-              </div>
-              <div className="text-[9.5px] text-safe-text-muted font-mono leading-none mt-0.5">
-                {m.unit}
-              </div>
-            </div>
-
-            {/* Semicircular Gauge Arc & Center Numeric */}
-            <div className="relative flex flex-col items-center justify-center my-0.5">
-              <div className="relative w-20 h-12 flex items-end justify-center">
-                <svg className="w-20 h-12 overflow-visible" viewBox="0 0 80 44">
-                  {/* Gauge background track */}
-                  <path
-                    d="M 8 40 A 32 32 0 0 1 72 40"
-                    fill="none"
-                    stroke="#0A1720"
-                    strokeWidth="5.5"
-                    strokeLinecap="round"
-                  />
-                  {/* Gauge active value arc */}
-                  <path
-                    d="M 8 40 A 32 32 0 0 1 72 40"
-                    fill="none"
-                    stroke={m.color}
-                    strokeWidth="5.5"
-                    strokeDasharray="100"
-                    strokeDashoffset={100 - (100 * m.percentage) / 100}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                {/* Center Numeric Value */}
-                <div className="absolute inset-0 flex items-center justify-center pt-2">
-                  <span
-                    className="text-[30px] font-bold font-mono tabular-nums leading-none"
-                    style={{ color: m.color }}
-                  >
-                    {m.value}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Min / Max scale bounds */}
-            <div className="flex justify-between items-center text-[9.5px] font-mono text-safe-text-muted px-1 pt-0.5 border-t border-safe-border-light">
-              <span>{m.min}</span>
-              <span>{m.max}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Right Patient Context & Review Completeness Panel (~35% width, 410px) */}
+      {/* Left Patient Context & Review Completeness Panel (Prime position, fluid width) */}
       <PatientContextSummary
         patient={patient}
         isRecordSigned={isRecordSigned}
         reviewProgressPercent={reviewProgressPercent}
-        className="w-[410px] shrink-0"
+        className="flex-1 min-w-[500px]"
       />
+
+      {/* Right Compact 6-Card Metric Grid (3x2, 440px width) */}
+      <div className="w-[440px] shrink-0 grid grid-cols-3 grid-rows-2 gap-1.5 h-full">
+        {kpiMetrics.map((m) => (
+          <div
+            key={m.id}
+            className="bg-safe-surface border border-safe-border rounded-[2px] p-1.5 flex flex-col justify-between relative overflow-hidden"
+          >
+            {/* Header label & unit */}
+            <div className="flex items-center justify-between gap-1 leading-none">
+              <span className="text-[10px] font-bold text-safe-text tracking-tight uppercase truncate" title={m.label}>
+                {m.label}
+              </span>
+              <span className="text-[8.5px] text-safe-text-muted font-mono shrink-0">
+                {m.unit}
+              </span>
+            </div>
+
+            {/* Numeric & Mini Bar */}
+            <div className="flex items-baseline justify-between my-0.5">
+              <span
+                className="text-[22px] font-bold font-mono tabular-nums leading-none"
+                style={{ color: m.color }}
+              >
+                {m.value}
+              </span>
+              <div className="flex items-center gap-1">
+                <div className="w-12 bg-safe-surface-secondary h-1.5 rounded-none overflow-hidden border border-safe-border-light">
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{ width: `${m.percentage}%`, backgroundColor: m.color }}
+                  />
+                </div>
+                <span className="text-[8.5px] font-mono text-safe-text-muted">{m.max}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

@@ -130,14 +130,14 @@ export function StructuredAnaesthesiaRecord() {
                 onClick={() => toggleSection(sec.id)}
                 className="w-full px-2 py-1.5 flex items-center justify-between text-left hover:bg-safe-surface-secondary transition-colors"
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   {isOpen ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-safe-cyan" />
+                    <ChevronDown className="w-4 h-4 text-safe-cyan shrink-0" />
                   ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-safe-text-muted" />
+                    <ChevronRight className="w-4 h-4 text-safe-text-muted shrink-0" />
                   )}
                   <span
-                    className={`text-[12px] font-semibold tracking-tight ${
+                    className={`text-[13px] font-bold tracking-tight ${
                       hasSelectedClaim ? "text-safe-cyan" : "text-safe-text"
                     }`}
                   >
@@ -146,7 +146,7 @@ export function StructuredAnaesthesiaRecord() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono text-safe-text-muted bg-safe-bg px-1.5 py-0.2 rounded-[2px] border border-safe-border-light">
+                  <span className="text-[10.5px] font-mono font-medium text-safe-text-muted bg-safe-bg px-1.5 py-0.2 rounded-[2px] border border-safe-border-light">
                     {t("table.claimsCount", { count: secClaims.length })}
                   </span>
                 </div>

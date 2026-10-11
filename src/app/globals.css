@@ -300,7 +300,7 @@
    widths, record and evidence share the right column instead of shrinking. */
 .uc02-review-regions {
   display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(520px, 1.55fr) minmax(380px, 1.2fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(440px, 1.1fr) minmax(350px, 0.9fr);
   grid-template-areas: "timeline record evidence";
   gap: var(--safe-panel-gap);
 }
@@ -311,8 +311,8 @@
 
 @media (max-width: 1599px) {
   .uc02-review-regions {
-    grid-template-columns: minmax(0, 1fr) minmax(390px, 420px);
-    grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(420px, 480px);
+    grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
     grid-template-areas: "timeline record" "timeline evidence";
   }
 }
