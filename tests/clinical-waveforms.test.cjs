@@ -139,6 +139,51 @@ test("waveform presentation render time extrapolates smoothly during playing and
   assert.equal(engine.waveformPresentationRenderTime(paused, 3_050), 4_500);
 });
 
+test("waveformMasterClock locks multi-channel sweeps into 100% vertical phase alignment", () => {
+  const master = new engine.WaveformMasterClock();
+
+  // Frame 1: Capnogram and Plethysmograph receive the first packet at simulationTime 10_000ms
+  const capnoTransition1 = master.synchronize(10_000, 1, "PLAYING", 5_000, 10_000);
+  const plethTransition1 = master.synchronize(10_000, 1, "PLAYING", 5_002, 10_000);
+
+  // Both channels must receive the exact same synchronized transition reference
+  assert.equal(capnoTransition1, plethTransition1);
+  assert.equal(capnoTransition1.fromTimeMs, 10_000);
+  assert.equal(capnoTransition1.toTimeMs, 10_000);
+  assert.equal(capnoTransition1.startedAt, 5_000);
+
+  // Subsequent frame at 5_050ms (simulating 50ms into playback)
+  const capnoRenderTime = engine.waveformPresentationRenderTime(capnoTransition1, 5_050);
+  const plethRenderTime = engine.waveformPresentationRenderTime(plethTransition1, 5_050);
+  assert.equal(capnoRenderTime, plethRenderTime);
+  assert.equal(capnoRenderTime, 10_050);
+
+  // Both sweep cursors at 800px width must be mathematically identical down to subpixels
+  const width = 800;
+  const windowMs = 10_000;
+  const capnoCursorX = engine.timeToX(capnoRenderTime % windowMs, 0, windowMs, width);
+  const plethCursorX = engine.timeToX(plethRenderTime % windowMs, 0, windowMs, width);
+  assert.equal(capnoCursorX, plethCursorX);
+  assert.equal(capnoCursorX, (50 / 10_000) * 800);
+
+  // Frame 2: Next network packet arrives at simulationTime 11_000ms
+  // Master clock interpolates smoothly forward from the active render time
+  const capnoTransition2 = master.synchronize(11_000, 1, "PLAYING", 6_000, 10_000);
+  const plethTransition2 = master.synchronize(11_000, 1, "PLAYING", 6_001, 10_000);
+  assert.equal(capnoTransition2, plethTransition2);
+  assert.equal(capnoTransition2.toTimeMs, 11_000);
+  assert.equal(capnoTransition2.startedAt, 6_000);
+
+  // Discontinuous seek/jump immediately snaps fromTimeMs to target across all channels
+  const seekTransition = master.synchronize(50_000, 1, "PLAYING", 7_000, 10_000);
+  assert.equal(seekTransition.fromTimeMs, 50_000);
+  assert.equal(seekTransition.toTimeMs, 50_000);
+
+  // Pausing stops extrapolation
+  const pauseTransition = master.synchronize(50_000, 1, "PAUSED", 7_100, 10_000);
+  assert.equal(engine.waveformPresentationRenderTime(pauseTransition, 8_000), 50_000);
+});
+
 test("ABP cursor selection maps to the visible waveform window, including midnight", () => {
   assert.equal(timeScale.waveformTimeAtRatio(0, "07:16:51", 8_000), "07:16:43");
   assert.equal(timeScale.waveformTimeAtRatio(0.5, "07:16:51", 8_000), "07:16:47");

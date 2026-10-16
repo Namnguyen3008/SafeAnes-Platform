@@ -7,6 +7,7 @@ import {
   projectSweepTraceSegments,
   projectTraceSegments,
   timeToX,
+  waveformMasterClock,
   waveformPresentationRenderTime,
   WaveformStream,
 } from "./waveformEngine";
@@ -182,6 +183,14 @@ export function ClinicalWaveformCanvas({
         workerRef.current = worker;
         isWorkerActiveRef.current = true;
 
+        const initialTransition = waveformMasterClock.getCurrentTransition(
+          source.simulationTimeMs,
+          source.playbackSpeed,
+          source.playbackStatus,
+          window.performance.now(),
+          source.windowMs
+        );
+
         worker.postMessage(
           {
             type: "INIT",
@@ -196,6 +205,7 @@ export function ClinicalWaveformCanvas({
               showCursor,
               sweepMode,
               waitingLabel,
+              transition: initialTransition,
             },
           },
           [offscreen]
@@ -311,36 +321,17 @@ export function ClinicalWaveformCanvas({
   useEffect(() => {
     renderGrid();
     const now = window.performance.now();
-    const previousCanonical = lastCanonicalTimeRef.current ?? source.simulationTimeMs;
-    const currentRendered = lastRenderTimeRef.current;
-
-    const elapsedSimMs = source.simulationTimeMs - previousCanonical;
-    const seekThresholdMs = Math.max(source.windowMs * 2, (source.playbackSpeed || 1) * 2_000);
-    const isDiscontinuous = elapsedSimMs < 0 || elapsedSimMs > seekThresholdMs;
-    const isPlaying = source.playbackStatus === "PLAYING";
-
-    let fromTimeMs: number;
-    if (isDiscontinuous || !isPlaying) {
-      fromTimeMs = source.simulationTimeMs;
-      lastRenderTimeRef.current = source.simulationTimeMs;
-    } else {
-      const drift = currentRendered - source.simulationTimeMs;
-      if (Math.abs(drift) <= 1_500 && currentRendered < source.simulationTimeMs) {
-        fromTimeMs = currentRendered;
-      } else {
-        fromTimeMs = source.simulationTimeMs;
-      }
-    }
+    const transition = waveformMasterClock.synchronize(
+      source.simulationTimeMs,
+      source.playbackSpeed,
+      source.playbackStatus,
+      now,
+      source.windowMs
+    );
 
     presentationRef.current = {
       targetTimeMs: source.simulationTimeMs,
-      transition: createWaveformPresentationTransition(
-        fromTimeMs,
-        Math.max(fromTimeMs, source.simulationTimeMs),
-        source.playbackSpeed,
-        source.playbackStatus,
-        now
-      ),
+      transition,
     };
     lastCanonicalTimeRef.current = source.simulationTimeMs;
     drawStateRef.current = {
@@ -359,7 +350,7 @@ export function ClinicalWaveformCanvas({
     if (isWorkerActiveRef.current && workerRef.current) {
       workerRef.current.postMessage({
         type: "UPDATE_SOURCE",
-        payload: { source },
+        payload: { source, transition },
       });
       workerRef.current.postMessage({
         type: "UPDATE_CONFIG",
@@ -632,9 +623,11 @@ function drawWaveform(
 
 function createInitialSweepState(source: ClinicalWaveformSource): SweepPresentationState {
   const playing = source.playbackStatus === "PLAYING";
+  const windowMs = sourceWindowMs(source);
+  const cycleStartMs = Math.floor(source.simulationTimeMs / windowMs) * windowMs;
   return {
     mode: playing ? "SWEEP" : "HISTORY",
-    cycleStartMs: playing ? source.simulationTimeMs : Math.max(0, source.simulationTimeMs - source.windowMs),
+    cycleStartMs,
     lastCanonicalTimeMs: source.simulationTimeMs,
     playbackStatus: source.playbackStatus,
     windowMs: source.windowMs,
@@ -655,15 +648,11 @@ function updateSweepState(
   const seekThresholdMs = Math.max(source.windowMs * 2, source.playbackSpeed * 1_500);
   const seeked = elapsedMs < 0 || elapsedMs > seekThresholdMs || previous.windowMs !== source.windowMs;
   const resumed = source.playbackStatus === "PLAYING" && previous.playbackStatus !== "PLAYING";
+  const windowMs = sourceWindowMs(source);
 
-  if (seeked) {
+  if (seeked || resumed) {
     previous.mode = source.playbackStatus === "PLAYING" ? "SWEEP" : "HISTORY";
-    previous.cycleStartMs = source.playbackStatus === "PLAYING"
-      ? source.simulationTimeMs
-      : Math.max(0, source.simulationTimeMs - source.windowMs);
-  } else if (resumed) {
-    previous.mode = "SWEEP";
-    previous.cycleStartMs = source.simulationTimeMs;
+    previous.cycleStartMs = Math.floor(source.simulationTimeMs / windowMs) * windowMs;
   }
 
   previous.lastCanonicalTimeMs = source.simulationTimeMs;
@@ -678,19 +667,13 @@ function resolveSweepPlotRange(
 ): WaveformPlotRange {
   if (!sweep) return getWaveformPlotRange(source, null, renderTimeMs);
   if (sweep.mode === "SWEEP") {
-    if (renderTimeMs < sweep.cycleStartMs) {
-      sweep.cycleStartMs = source.playbackStatus === "PLAYING"
-        ? renderTimeMs
-        : Math.max(0, renderTimeMs - source.windowMs);
-    } else if (renderTimeMs > sweep.cycleStartMs + sourceWindowMs(source)) {
-      const windowMs = sourceWindowMs(source);
-      const completedCycles = Math.floor((renderTimeMs - sweep.cycleStartMs) / windowMs);
-      sweep.cycleStartMs += completedCycles * windowMs;
-    }
+    const windowMs = sourceWindowMs(source);
+    const cycleStartMs = Math.floor(renderTimeMs / windowMs) * windowMs;
+    sweep.cycleStartMs = cycleStartMs;
     return {
-      startTimeMs: sweep.cycleStartMs,
-      endTimeMs: sweep.cycleStartMs + source.windowMs,
-      cursorTimeMs: Math.max(sweep.cycleStartMs, Math.min(renderTimeMs, sweep.cycleStartMs + source.windowMs)),
+      startTimeMs: cycleStartMs,
+      endTimeMs: cycleStartMs + windowMs,
+      cursorTimeMs: renderTimeMs,
     };
   }
   return getWaveformPlotRange(source, null, renderTimeMs);

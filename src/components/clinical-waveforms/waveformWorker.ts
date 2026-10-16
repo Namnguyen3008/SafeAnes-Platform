@@ -27,10 +27,12 @@ export interface WaveformWorkerInitPayload {
   showCursor: boolean;
   sweepMode: boolean;
   waitingLabel: string;
+  transition?: WaveformPresentationTransition;
 }
 
 export interface WaveformWorkerUpdatePayload {
   source: ClinicalWaveformSource;
+  transition?: WaveformPresentationTransition;
 }
 
 export interface WaveformWorkerConfigPayload {
@@ -154,20 +156,28 @@ function handleInit(payload: WaveformWorkerInitPayload): void {
   waitingLabel = payload.waitingLabel;
 
   sweep = createInitialSweepState(source);
-  lastRenderTime = source.simulationTimeMs;
   lastCanonicalTime = source.simulationTimeMs;
   updateStreamIfNeeded(source);
 
-  presentation = {
-    targetTimeMs: source.simulationTimeMs,
-    transition: createWaveformPresentationTransition(
-      source.simulationTimeMs,
-      source.simulationTimeMs,
-      source.playbackSpeed,
-      source.playbackStatus,
-      performance.now()
-    ),
-  };
+  if (payload.transition) {
+    presentation = {
+      targetTimeMs: payload.transition.toTimeMs,
+      transition: payload.transition,
+    };
+    lastRenderTime = waveformPresentationRenderTime(payload.transition, performance.now());
+  } else {
+    lastRenderTime = source.simulationTimeMs;
+    presentation = {
+      targetTimeMs: source.simulationTimeMs,
+      transition: createWaveformPresentationTransition(
+        source.simulationTimeMs,
+        source.simulationTimeMs,
+        source.playbackSpeed,
+        source.playbackStatus,
+        performance.now()
+      ),
+    };
+  }
 
   scheduler = createPaintScheduler(
     (cb) => self.requestAnimationFrame(cb),
@@ -182,38 +192,49 @@ function handleUpdateSource(payload: WaveformWorkerUpdatePayload): void {
   if (!source) return;
   const newSource = payload.source;
   const now = performance.now();
-  const previousCanonical = lastCanonicalTime ?? newSource.simulationTimeMs;
-  const currentRendered = lastRenderTime;
 
-  const elapsedSimMs = newSource.simulationTimeMs - previousCanonical;
-  const seekThresholdMs = Math.max(newSource.windowMs * 2, (newSource.playbackSpeed || 1) * 2_000);
-  const isDiscontinuous = elapsedSimMs < 0 || elapsedSimMs > seekThresholdMs;
-  const isPlaying = newSource.playbackStatus === "PLAYING";
-
-  let fromTimeMs: number;
-  if (isDiscontinuous || !isPlaying) {
-    fromTimeMs = newSource.simulationTimeMs;
-    lastRenderTime = newSource.simulationTimeMs;
+  if (payload.transition) {
+    presentation = {
+      targetTimeMs: payload.transition.toTimeMs,
+      transition: payload.transition,
+    };
+    lastCanonicalTime = newSource.simulationTimeMs;
+    lastRenderTime = waveformPresentationRenderTime(payload.transition, now);
   } else {
-    const drift = currentRendered - newSource.simulationTimeMs;
-    if (Math.abs(drift) <= 1_500 && currentRendered < newSource.simulationTimeMs) {
-      fromTimeMs = currentRendered;
-    } else {
+    const previousCanonical = lastCanonicalTime ?? newSource.simulationTimeMs;
+    const currentRendered = lastRenderTime;
+
+    const elapsedSimMs = newSource.simulationTimeMs - previousCanonical;
+    const seekThresholdMs = Math.max(newSource.windowMs * 2, (newSource.playbackSpeed || 1) * 2_000);
+    const isDiscontinuous = elapsedSimMs < 0 || elapsedSimMs > seekThresholdMs;
+    const isPlaying = newSource.playbackStatus === "PLAYING";
+
+    let fromTimeMs: number;
+    if (isDiscontinuous || !isPlaying) {
       fromTimeMs = newSource.simulationTimeMs;
+      lastRenderTime = newSource.simulationTimeMs;
+    } else {
+      const drift = currentRendered - newSource.simulationTimeMs;
+      if (Math.abs(drift) <= 1_500 && currentRendered < newSource.simulationTimeMs) {
+        fromTimeMs = currentRendered;
+      } else {
+        fromTimeMs = newSource.simulationTimeMs;
+      }
     }
+
+    presentation = {
+      targetTimeMs: newSource.simulationTimeMs,
+      transition: createWaveformPresentationTransition(
+        fromTimeMs,
+        Math.max(fromTimeMs, newSource.simulationTimeMs),
+        newSource.playbackSpeed,
+        newSource.playbackStatus,
+        now
+      ),
+    };
+    lastCanonicalTime = newSource.simulationTimeMs;
   }
 
-  presentation = {
-    targetTimeMs: newSource.simulationTimeMs,
-    transition: createWaveformPresentationTransition(
-      fromTimeMs,
-      Math.max(fromTimeMs, newSource.simulationTimeMs),
-      newSource.playbackSpeed,
-      newSource.playbackStatus,
-      now
-    ),
-  };
-  lastCanonicalTime = newSource.simulationTimeMs;
   source = newSource;
   updateStreamIfNeeded(newSource);
   updateSweepState(sweep, newSource);
@@ -263,9 +284,11 @@ function updateStreamIfNeeded(src: ClinicalWaveformSource): void {
 
 function createInitialSweepState(src: ClinicalWaveformSource): SweepPresentationState {
   const playing = src.playbackStatus === "PLAYING";
+  const windowMs = sourceWindowMs(src);
+  const cycleStartMs = Math.floor(src.simulationTimeMs / windowMs) * windowMs;
   return {
     mode: playing ? "SWEEP" : "HISTORY",
-    cycleStartMs: playing ? src.simulationTimeMs : Math.max(0, src.simulationTimeMs - src.windowMs),
+    cycleStartMs,
     lastCanonicalTimeMs: src.simulationTimeMs,
     playbackStatus: src.playbackStatus,
     windowMs: src.windowMs,
@@ -276,22 +299,22 @@ function updateSweepState(state: SweepPresentationState | null, src: ClinicalWav
   if (!state) return;
   const elapsedMs = src.simulationTimeMs - state.lastCanonicalTimeMs;
   const seekThresholdMs = Math.max(src.windowMs * 2, src.playbackSpeed * 1_500);
-  const seeked = elapsedMs < 0 || elapsedMs > seekThresholdMs || state.windowMs !== src.windowMs;
+  const seeked = elapsedMs < 0 || elapsedSimMsThreshold(elapsedMs, seekThresholdMs) || state.windowMs !== src.windowMs;
   const resumed = src.playbackStatus === "PLAYING" && state.playbackStatus !== "PLAYING";
+  const windowMs = sourceWindowMs(src);
 
-  if (seeked) {
+  if (seeked || resumed) {
     state.mode = src.playbackStatus === "PLAYING" ? "SWEEP" : "HISTORY";
-    state.cycleStartMs = src.playbackStatus === "PLAYING"
-      ? src.simulationTimeMs
-      : Math.max(0, src.simulationTimeMs - src.windowMs);
-  } else if (resumed) {
-    state.mode = "SWEEP";
-    state.cycleStartMs = src.simulationTimeMs;
+    state.cycleStartMs = Math.floor(src.simulationTimeMs / windowMs) * windowMs;
   }
 
   state.lastCanonicalTimeMs = src.simulationTimeMs;
   state.playbackStatus = src.playbackStatus;
   state.windowMs = src.windowMs;
+}
+
+function elapsedSimMsThreshold(elapsedMs: number, thresholdMs: number): boolean {
+  return elapsedMs > thresholdMs;
 }
 
 function resolveSweepPlotRange(
@@ -301,19 +324,13 @@ function resolveSweepPlotRange(
 ): WaveformPlotRange {
   if (!state) return getWaveformPlotRange(src, null, renderTimeMs);
   if (state.mode === "SWEEP") {
-    if (renderTimeMs < state.cycleStartMs) {
-      state.cycleStartMs = src.playbackStatus === "PLAYING"
-        ? renderTimeMs
-        : Math.max(0, renderTimeMs - src.windowMs);
-    } else if (renderTimeMs > state.cycleStartMs + sourceWindowMs(src)) {
-      const windowMs = sourceWindowMs(src);
-      const completedCycles = Math.floor((renderTimeMs - state.cycleStartMs) / windowMs);
-      state.cycleStartMs += completedCycles * windowMs;
-    }
+    const windowMs = sourceWindowMs(src);
+    const cycleStartMs = Math.floor(renderTimeMs / windowMs) * windowMs;
+    state.cycleStartMs = cycleStartMs;
     return {
-      startTimeMs: state.cycleStartMs,
-      endTimeMs: state.cycleStartMs + src.windowMs,
-      cursorTimeMs: Math.max(state.cycleStartMs, Math.min(renderTimeMs, state.cycleStartMs + src.windowMs)),
+      startTimeMs: cycleStartMs,
+      endTimeMs: cycleStartMs + windowMs,
+      cursorTimeMs: renderTimeMs,
     };
   }
   return getWaveformPlotRange(src, null, renderTimeMs);

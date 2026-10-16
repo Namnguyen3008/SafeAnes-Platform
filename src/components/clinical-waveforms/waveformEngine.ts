@@ -78,17 +78,112 @@ export function waveformPresentationRenderTime(
   maxExtrapolationMs: number = 1_500
 ): number {
   if (!Number.isFinite(now)) throw new RangeError("Presentation frame time must be finite.");
-  if (transition.status !== "PLAYING" || transition.durationMs <= 0) {
+  if (transition.status !== "PLAYING") {
     return transition.toTimeMs;
   }
   const elapsed = now - transition.startedAt;
-  if (elapsed <= transition.durationMs) {
+  const durationMs = Math.max(0, transition.durationMs);
+  if (durationMs > 0 && elapsed <= durationMs) {
     return waveformPresentationTimeAt(transition, now);
   }
-  const overdueMs = Math.min(elapsed - transition.durationMs, Math.max(0, maxExtrapolationMs));
+  const overdueMs = Math.min(Math.max(0, elapsed - durationMs), Math.max(0, maxExtrapolationMs));
   const speed = transition.speed > 0 ? transition.speed : 1;
   return transition.toTimeMs + overdueMs * speed;
 }
+
+/**
+ * Master presentation clock coordinating all clinical waveform channels (ECG, ABP, Pleth, Capno).
+ * In clinical monitors (e.g. Mindray, Philips IntelliVue), all waveform channels on the same screen
+ * sweep in 100% phase lockstep from a unified master time base.
+ *
+ * This singleton calculates and caches the single canonical transition per simulation tick,
+ * ensuring all channels and their Web Worker threads evaluate identical `renderTimeMs` and `cursorX`
+ * on every 60fps frame, eliminating inter-channel vertical sweep bar misalignment.
+ */
+export class WaveformMasterClock {
+  private lastCanonicalTime: number | null = null;
+  private activeTransition: WaveformPresentationTransition | null = null;
+  private lastStatus: SimulationClockStatus = "PAUSED";
+  private lastSpeed: number = 1;
+
+  public synchronize(
+    simulationTimeMs: number,
+    playbackSpeed: number,
+    playbackStatus: SimulationClockStatus,
+    now: number = typeof performance !== "undefined" ? performance.now() : 0,
+    windowMs: number = 10_000
+  ): WaveformPresentationTransition {
+    if (
+      this.activeTransition &&
+      this.lastCanonicalTime === simulationTimeMs &&
+      this.lastStatus === playbackStatus &&
+      this.lastSpeed === playbackSpeed
+    ) {
+      return this.activeTransition;
+    }
+
+    const previousCanonical = this.lastCanonicalTime ?? simulationTimeMs;
+    const elapsedSimMs = simulationTimeMs - previousCanonical;
+    const seekThresholdMs = Math.max(windowMs * 2, (playbackSpeed || 1) * 2_000);
+    const isDiscontinuous = elapsedSimMs < 0 || elapsedSimMs > seekThresholdMs;
+    const isPlaying = playbackStatus === "PLAYING";
+
+    let fromTimeMs: number;
+    if (isDiscontinuous || !isPlaying || !this.activeTransition) {
+      fromTimeMs = simulationTimeMs;
+    } else {
+      const currentRendered = waveformPresentationRenderTime(this.activeTransition, now);
+      const drift = currentRendered - simulationTimeMs;
+      if (Math.abs(drift) <= 1_500 && currentRendered < simulationTimeMs) {
+        fromTimeMs = currentRendered;
+      } else {
+        fromTimeMs = simulationTimeMs;
+      }
+    }
+
+    const transition = createWaveformPresentationTransition(
+      fromTimeMs,
+      Math.max(fromTimeMs, simulationTimeMs),
+      playbackSpeed,
+      playbackStatus,
+      now
+    );
+
+    this.lastCanonicalTime = simulationTimeMs;
+    this.lastStatus = playbackStatus;
+    this.lastSpeed = playbackSpeed;
+    this.activeTransition = transition;
+
+    return transition;
+  }
+
+  public getCurrentTransition(
+    simulationTimeMs: number,
+    playbackSpeed: number,
+    playbackStatus: SimulationClockStatus,
+    now: number = typeof performance !== "undefined" ? performance.now() : 0,
+    windowMs: number = 10_000
+  ): WaveformPresentationTransition {
+    if (
+      this.activeTransition &&
+      this.lastCanonicalTime === simulationTimeMs &&
+      this.lastStatus === playbackStatus &&
+      this.lastSpeed === playbackSpeed
+    ) {
+      return this.activeTransition;
+    }
+    return this.synchronize(simulationTimeMs, playbackSpeed, playbackStatus, now, windowMs);
+  }
+
+  public reset(): void {
+    this.lastCanonicalTime = null;
+    this.activeTransition = null;
+    this.lastStatus = "PAUSED";
+    this.lastSpeed = 1;
+  }
+}
+
+export const waveformMasterClock = new WaveformMasterClock();
 
 export interface WaveformStreamOptions {
   seed: number;
