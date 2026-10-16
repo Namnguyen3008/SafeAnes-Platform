@@ -19,8 +19,9 @@ from backend.app.repositories.case_repository import CaseRepository, normalize_c
 class _NumericTrackIndex:
     starts: np.ndarray
     prefix_ends: np.ndarray
-    values: tuple[np.ndarray, ...]
+    values: tuple[np.ndarray, ...] | np.ndarray
     sample_rate_hz: float | None
+    is_scalar: bool = False
 
 
 class VitalDBRepository:
@@ -123,37 +124,46 @@ class VitalDBRepository:
         first_record = int(np.searchsorted(numeric_index.prefix_ends, start_time_s, side="right"))
         stop_record = int(np.searchsorted(numeric_index.starts, end_time_s, side="left"))
         values: list[tuple[float, float | None]] = []
-        for record_index in range(first_record, stop_record):
-            relative = float(numeric_index.starts[record_index])
-            flat = numeric_index.values[record_index]
-            if flat.size == 1:
+        if numeric_index.is_scalar:
+            starts_arr = numeric_index.starts
+            vals_arr = numeric_index.values
+            for record_index in range(first_record, stop_record):
+                relative = float(starts_arr[record_index])
                 if start_time_s <= relative < end_time_s:
-                    values.append((relative, _finite_float(flat[0])))
-                continue
+                    v = float(vals_arr[record_index])
+                    values.append((relative, _finite_float(v)))
+        else:
+            for record_index in range(first_record, stop_record):
+                relative = float(numeric_index.starts[record_index])
+                flat = numeric_index.values[record_index]
+                if flat.size == 1:
+                    if start_time_s <= relative < end_time_s:
+                        values.append((relative, _finite_float(flat[0])))
+                    continue
 
-            # Multi-value numeric records use their verified source cadence.
-            assert rate is not None
-            first = max(0, int(math.ceil((start_time_s - relative) * rate - 1e-9)))
-            stop = min(flat.size, int(math.ceil((end_time_s - relative) * rate - 1e-9)))
-            if stop > first:
-                if len(values) + stop - first > self.settings.max_samples_per_response:
+                # Multi-value numeric records use their verified source cadence.
+                assert rate is not None
+                first = max(0, int(math.ceil((start_time_s - relative) * rate - 1e-9)))
+                stop = min(flat.size, int(math.ceil((end_time_s - relative) * rate - 1e-9)))
+                if stop > first:
+                    if len(values) + stop - first > self.settings.max_samples_per_response:
+                        raise ApiServiceError(
+                            "INVALID_TIME_RANGE",
+                            "Requested numeric window exceeds the response sample limit",
+                            status_code=422,
+                            details={"max_samples": self.settings.max_samples_per_response},
+                        )
+                    values.extend(
+                        (relative + index / rate, _finite_float(flat[index]))
+                        for index in range(first, stop)
+                    )
+                if len(values) > self.settings.max_samples_per_response:
                     raise ApiServiceError(
                         "INVALID_TIME_RANGE",
                         "Requested numeric window exceeds the response sample limit",
                         status_code=422,
                         details={"max_samples": self.settings.max_samples_per_response},
                     )
-                values.extend(
-                    (relative + index / rate, _finite_float(flat[index]))
-                    for index in range(first, stop)
-                )
-            if len(values) > self.settings.max_samples_per_response:
-                raise ApiServiceError(
-                    "INVALID_TIME_RANGE",
-                    "Requested numeric window exceeds the response sample limit",
-                    status_code=422,
-                    details={"max_samples": self.settings.max_samples_per_response},
-                )
         values.sort(key=lambda item: item[0])
         provenance = _provenance(manifest, track_name)
         source = _not_recorded(getattr(track, "dname", None) or metadata.get("source_device"))
@@ -201,42 +211,86 @@ class VitalDBRepository:
         sample_rate = _positive_rate(getattr(track, "srate", None))
         if sample_rate is None:
             sample_rate = _positive_rate(metadata.get("observed_update_rate_hz"))
-        records: list[tuple[float, np.ndarray]] = []
+
+        is_all_scalar = True
+        scalar_starts: list[float] = []
+        scalar_vals: list[float] = []
+        multi_records: list[tuple[float, np.ndarray]] = []
+
         for record in getattr(track, "recs", ()) or ():
             record_time = _finite_float(_record_value(record, "dt"))
             if record_time is None:
                 continue
+            raw_val = _record_value(record, "val")
+            if is_all_scalar:
+                if isinstance(raw_val, (int, float)):
+                    scalar_starts.append(record_time - origin)
+                    scalar_vals.append(float(raw_val))
+                    continue
+                if hasattr(raw_val, "__len__") and len(raw_val) == 1:
+                    try:
+                        scalar_starts.append(record_time - origin)
+                        scalar_vals.append(float(raw_val[0]))
+                        continue
+                    except (TypeError, ValueError):
+                        pass
+
+                is_all_scalar = False
+                for s, v in zip(scalar_starts, scalar_vals):
+                    multi_records.append((s, np.array([v], dtype=np.float32)))
+                scalar_starts.clear()
+                scalar_vals.clear()
+
             try:
-                flat = np.asarray(_record_value(record, "val")).reshape(-1)
+                flat = np.asarray(raw_val).reshape(-1)
             except (TypeError, ValueError) as exc:
                 raise insufficient_data(f"Numeric track {track_name} contains an invalid record") from exc
             if flat.size > 1 and sample_rate is None:
                 raise insufficient_data(
                     f"Numeric track {track_name} contains a multi-value record without a verified sample rate"
                 )
-            records.append((record_time - origin, flat))
-        records.sort(key=lambda item: item[0])
+            multi_records.append((record_time - origin, flat))
 
-        starts = np.fromiter((record[0] for record in records), dtype=np.float64, count=len(records))
-        values_by_record = tuple(record[1] for record in records)
-        ends = np.fromiter((
-            start + (float(values.size) / sample_rate if values.size > 1 and sample_rate else 0.0)
-            for start, values in records
-        ), dtype=np.float64, count=len(records))
-        if len(ends):
-            # Scalar measurements at the window start are inclusive; using the
-            # next representable float keeps them in the overlap search.
-            for index, values in enumerate(values_by_record):
-                if values.size == 1:
-                    ends[index] = np.nextafter(starts[index], math.inf)
-            np.maximum.accumulate(ends, out=ends)
+        if is_all_scalar:
+            if not scalar_starts:
+                starts = np.empty(0, dtype=np.float64)
+                vals = np.empty(0, dtype=np.float32)
+                ends = np.empty(0, dtype=np.float64)
+            else:
+                starts = np.fromiter(scalar_starts, dtype=np.float64, count=len(scalar_starts))
+                vals = np.fromiter(scalar_vals, dtype=np.float32, count=len(scalar_vals))
+                sort_idx = np.argsort(starts)
+                starts = starts[sort_idx]
+                vals = vals[sort_idx]
+                ends = np.nextafter(starts, math.inf)
+            built = _NumericTrackIndex(
+                starts=starts,
+                prefix_ends=ends,
+                values=vals,
+                sample_rate_hz=sample_rate,
+                is_scalar=True,
+            )
+        else:
+            multi_records.sort(key=lambda item: item[0])
+            starts = np.fromiter((record[0] for record in multi_records), dtype=np.float64, count=len(multi_records))
+            values_by_record = tuple(record[1] for record in multi_records)
+            ends = np.fromiter((
+                start + (float(values.size) / sample_rate if values.size > 1 and sample_rate else 0.0)
+                for start, values in multi_records
+            ), dtype=np.float64, count=len(multi_records))
+            if len(ends):
+                for index, values in enumerate(values_by_record):
+                    if values.size == 1:
+                        ends[index] = np.nextafter(starts[index], math.inf)
+                np.maximum.accumulate(ends, out=ends)
+            built = _NumericTrackIndex(
+                starts=starts,
+                prefix_ends=ends,
+                values=values_by_record,
+                sample_rate_hz=sample_rate,
+                is_scalar=False,
+            )
 
-        built = _NumericTrackIndex(
-            starts=starts,
-            prefix_ends=ends,
-            values=values_by_record,
-            sample_rate_hz=sample_rate,
-        )
         with self._lock:
             cached = self._numeric_series.get(key)
             if cached is not None:

@@ -102,6 +102,8 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   const [session, setSession] = useState<VitalDbReplaySession | null>(null);
   const [buffers, setBuffers] = useState<VitalDbReplayBuffers>(EMPTY_BUFFERS);
   const [selectedRecordedEvent, setSelectedRecordedEvent] = useState<VitalDbRecordedSelection | null>(null);
+  const [liveUc05Predictions, setLiveUc05Predictions] = useState<UC05VitalDbPrediction[]>([]);
+  const [liveUc04Predictions, setLiveUc04Predictions] = useState<UC04VitalDbPrediction[]>([]);
   // Keep source switching unavailable until the case catalog and model status
   // have loaded; otherwise a fast first click can be discarded before a case
   // is selected and leave the control showing Synthetic Demo.
@@ -355,6 +357,8 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   }, [mutateSession]);
   const reset = useCallback(async () => {
     applyBuffers(EMPTY_BUFFERS);
+    setLiveUc05Predictions([]);
+    setLiveUc04Predictions([]);
     setSelectedRecordedEvent(null);
     await mutateSession("/reset");
   }, [applyBuffers, mutateSession]);
@@ -383,6 +387,8 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
         const frame = JSON.parse((event as MessageEvent<string>).data) as ReplaySnapshotFrame;
         if (frame.case_id !== selectedCaseId || sessionRef.current?.session_id !== session.session_id) return;
         applyBuffers(replaceVitalDbReplaySnapshot(frame));
+        setLiveUc05Predictions([]);
+        setLiveUc04Predictions([]);
         setSelectedRecordedEvent((selection) =>
           retainReplayEventSelectionAtTime(selection, frame.as_of_s),
         );
@@ -417,15 +423,36 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
         setError("Recorded VitalDB replay stream failed.");
       }
     };
+    const onInferenceResult = (event: Event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent<string>).data);
+        if (payload.session_id !== session.session_id || payload.case_id !== selectedCaseId) return;
+        const currentGen = sessionRef.current?.generation ?? 1;
+        if (payload.generation !== undefined && payload.generation < currentGen) return;
+
+        if (Array.isArray(payload.predictions) && payload.predictions.length > 0) {
+          if (String(payload.model_id).includes("UC05") || String(payload.model_id).includes("RespFormer")) {
+            setLiveUc05Predictions(payload.predictions as UC05VitalDbPrediction[]);
+          } else {
+            setLiveUc04Predictions(payload.predictions as UC04VitalDbPrediction[]);
+          }
+        }
+      } catch {
+        // Silently tolerate parse anomalies in live predictions
+      }
+    };
+
     source.addEventListener("snapshot", onSnapshot);
     source.addEventListener("reset", onReset);
     source.addEventListener("data", onData);
+    source.addEventListener("inference_result", onInferenceResult);
     source.addEventListener("complete", onComplete);
     source.addEventListener("error", onStreamError);
     return () => {
       source.removeEventListener("snapshot", onSnapshot);
       source.removeEventListener("reset", onReset);
       source.removeEventListener("data", onData);
+      source.removeEventListener("inference_result", onInferenceResult);
       source.removeEventListener("complete", onComplete);
       source.removeEventListener("error", onStreamError);
       source.close();
@@ -447,11 +474,11 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     ? collectEvents(buffers, replayTime)
     : [], [buffers, mode, replayTime]);
   const uc04Predictions = useMemo(() => mode === "VITALDB_REPLAY"
-    ? buffers.uc04View?.predictions?.predictions ?? []
-    : [], [buffers.uc04View, mode]);
+    ? (liveUc04Predictions.length > 0 ? liveUc04Predictions : (buffers.uc04View?.predictions?.predictions ?? []))
+    : [], [buffers.uc04View, liveUc04Predictions, mode]);
   const uc05Predictions = useMemo(() => mode === "VITALDB_REPLAY"
-    ? predictionRows<UC05VitalDbPrediction>(buffers.uc05View?.predictions)
-    : [], [buffers.uc05View, mode]);
+    ? (liveUc05Predictions.length > 0 ? liveUc05Predictions : predictionRows<UC05VitalDbPrediction>(buffers.uc05View?.predictions))
+    : [], [buffers.uc05View, liveUc05Predictions, mode]);
   const availability = useMemo(() => {
     if (mode !== "VITALDB_REPLAY") return {};
     const result: Record<string, AvailabilityStatus> = {

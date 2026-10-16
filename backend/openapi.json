@@ -3061,6 +3061,11 @@
             "const": "seconds_since_case_start",
             "title": "Time Basis",
             "default": "seconds_since_case_start"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation",
+            "default": 1
           }
         },
         "additionalProperties": false,

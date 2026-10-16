@@ -69,9 +69,9 @@ class Settings:
     max_waveform_range_seconds: float = 120.0
     max_samples_per_response: int = 200_000
     # Replay frames touch both UC04/UC05 numeric tracks and waveform sources.
-    # Retaining that bounded working set avoids reopening the same VitalDB
-    # tracks on every short SSE chunk.
-    signal_file_cache_entries: int = 24
+    # Retaining a tightly bounded working set avoids reopening VitalDB tracks
+    # while strictly enforcing cloud container memory limits (512MB).
+    signal_file_cache_entries: int = 6
     model_series_cache_entries: int = 2
     prediction_cache_entries: int = 2
     build_id: str = field(default_factory=get_backend_build_id)

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import numpy as np
@@ -7,9 +8,10 @@ from backend.app.ml.contracts.window import InferenceWindow, SignalWindow
 from backend.app.ml.inference.base import ModelNotLoadedError
 from backend.app.ml.inference.uc04 import UC04InferenceService
 from backend.app.ml.models.uc04.architecture import NUM_KEYS
+from backend.app.ml.registry.artifacts import default_model_root
 
 
-MODEL_ROOT = Path(r"C:\Users\Namdr\Downloads\model")
+MODEL_ROOT = Path(os.environ.get("SAFEANES_MODEL_ROOT", default_model_root()))
 
 
 def make_uc04_window() -> InferenceWindow:

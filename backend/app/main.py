@@ -20,14 +20,18 @@ from backend.app.core.config import Settings
 from backend.app.core.errors import ApiServiceError
 from backend.app.core.logging_config import configure_logging
 from backend.app.repositories.case_repository import CaseRepository
+from backend.app.repositories.supabase_vitaldb_repository import SupabaseVitalDBRepository
 from backend.app.repositories.vitaldb_repository import VitalDBRepository
 from backend.app.schemas.api import ErrorResponse
 from backend.app.services.cases.service import CaseService
+from backend.app.services.inference.inference_worker import LiveInferenceWorker
 from backend.app.services.inference.model_manager import ModelManager
 from backend.app.services.inference.uc04_batch import UC04OfflineBatchService
 from backend.app.services.inference.uc05_batch import UC05OfflineBatchService
 from backend.app.services.replay.manager import ReplayManager
+from backend.app.services.replay.replay_scheduler import ReplayInferenceScheduler
 from backend.app.services.replay.stream import ReplayStreamService
+from backend.app.services.replay.window_loader import WindowLoader
 from backend.app.services.signals.service import SignalService
 from backend.app.services.signals.uc04_view import UC04VitalDBViewService
 from backend.app.services.signals.uc05_view import UC05VitalDBViewService
@@ -50,6 +54,7 @@ class BackendRuntime:
         self.settings = settings
         self.cases = CaseRepository(settings)
         self.vitaldb = VitalDBRepository(settings, self.cases, vitaldb_module=vitaldb_module)
+        self.supabase = SupabaseVitalDBRepository()
         self.case_service = CaseService(self.cases)
         self.signal_service = SignalService(settings, self.cases, self.vitaldb)
         self.models = ModelManager(settings, self.vitaldb, load_models=load_models)
@@ -63,6 +68,9 @@ class BackendRuntime:
             self.uc05_batch.cache, self.models,
         )
         self.replay = ReplayManager()
+        self.window_loader = WindowLoader(self.vitaldb, self.models.preprocessor)
+        self.inference_worker = LiveInferenceWorker(self.models, self.window_loader)
+        self.replay_scheduler = ReplayInferenceScheduler(self.inference_worker)
         self.replay_stream = ReplayStreamService(
             settings,
             self.cases,
@@ -77,6 +85,7 @@ class BackendRuntime:
         self.models.initialize()
 
     def close(self) -> None:
+        self.inference_worker.close()
         self.replay.close()
         self.models.close()
 

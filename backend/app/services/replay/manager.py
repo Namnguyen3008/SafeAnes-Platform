@@ -27,6 +27,7 @@ class ReplaySession:
     uc05_model_status: str
     _anchor_time_s: float
     _anchor_monotonic: float
+    generation: int = 1
 
 
 class ReplayManager:
@@ -118,6 +119,7 @@ class ReplayManager:
             session.current_time_s = 0.0
             session.status = "STOPPED"
             session.started_at = None
+            session.generation += 1
             self._touch(session)
             self._anchor(session)
             return self._snapshot(session)
@@ -128,6 +130,7 @@ class ReplayManager:
             self._validate_time(time_s, session.duration_seconds)
             session.current_time_s = float(time_s)
             session.status = "COMPLETED" if time_s >= session.duration_seconds else "PAUSED"
+            session.generation += 1
             self._touch(session)
             self._anchor(session)
             return self._snapshot(session)
@@ -202,4 +205,5 @@ class ReplayManager:
             "uc04_model_status": session.uc04_model_status,
             "uc05_model_status": session.uc05_model_status,
             "time_basis": "seconds_since_case_start",
+            "generation": session.generation,
         }

@@ -94,15 +94,25 @@ async function proxy(request: Request, context: RouteContext): Promise<Response>
     }
   }
 
-  try {
-    const upstream = await fetch(target, {
-      method,
-      headers,
-      body,
-      cache: "no-store",
-      redirect: "manual",
-      signal: request.signal,
-    });
+  let upstream: Response | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      upstream = await fetch(target, {
+        method,
+        headers,
+        body,
+        cache: "no-store",
+        redirect: "manual",
+        signal: request.signal,
+      });
+      if (upstream.status < 500 || attempt > 0) break;
+    } catch {
+      if (attempt > 0) break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  }
+
+  if (upstream) {
     if (upstream.status >= 500) {
       const fallback = await handleSupabaseFallback(path);
       if (fallback) return fallback;
@@ -117,14 +127,14 @@ async function proxy(request: Request, context: RouteContext): Promise<Response>
       status: upstream.status,
       headers: responseHeaders,
     });
-  } catch {
-    const fallback = await handleSupabaseFallback(path);
-    if (fallback) return fallback;
-    return NextResponse.json(
-      { error: { code: "BACKEND_UNAVAILABLE", message: "The SafeAnes backend is unavailable." } },
-      { status: 502 },
-    );
   }
+
+  const fallback = await handleSupabaseFallback(path);
+  if (fallback) return fallback;
+  return NextResponse.json(
+    { error: { code: "BACKEND_UNAVAILABLE", message: "The SafeAnes backend is unavailable." } },
+    { status: 502 },
+  );
 }
 
 export const GET = proxy;

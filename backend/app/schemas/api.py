@@ -297,3 +297,4 @@ class ReplaySessionResponse(ApiModel):
     uc04_model_status: str
     uc05_model_status: str
     time_basis: Literal["seconds_since_case_start"] = "seconds_since_case_start"
+    generation: int = 1
