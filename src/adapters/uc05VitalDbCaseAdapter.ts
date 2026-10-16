@@ -86,10 +86,10 @@ export function toRespiratoryVitalDbCaseData(
   const firstOutput = primaryOutputs[0];
   const outputRows = latestOutputs.map((item) => ({
     horizonMinutes: item.horizon_minutes_or_null,
-    value: item.interpreted_output.value,
+    value: item.interpreted_output?.value ?? null,
     rawOutput: item.raw_output,
-    kind: item.interpreted_output.kind,
-    calibrated: item.interpreted_output.calibrated === true,
+    kind: item.interpreted_output?.kind ?? "UNKNOWN",
+    calibrated: item.interpreted_output?.calibrated === true,
     predictionTime: item.prediction_time,
   }));
   const prediction = {

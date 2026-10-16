@@ -4,7 +4,6 @@ import type { Observation } from "../types/observations";
 import type { PredictionEvent } from "../types/predictions";
 import type { HemodynamicRiskKnot } from "../types/scenarioManifest";
 import type { SimulationProcessingContext, SimulationStageResult } from "../types/replay";
-import type { WaveformSegment } from "../types/waveforms";
 
 const MINUTE_MS = 60_000;
 const MAX_OBSERVATION_AGE_MS = 45_000;

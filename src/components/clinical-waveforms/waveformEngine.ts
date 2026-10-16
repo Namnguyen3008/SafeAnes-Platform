@@ -485,7 +485,7 @@ interface ProjectionBucket {
   maximum: IndexedPlotPoint;
 }
 
-function createTraceSegmentWriter(width: number, maxPointsPerSegment?: number) {
+function createTraceSegmentWriter(_width: number, maxPointsPerSegment?: number) {
   const finiteBudget = Number.isFinite(maxPointsPerSegment) && (maxPointsPerSegment ?? 0) > 0;
   // Four retained representatives (first, min, max, last) preserve the shape
   // and extrema within each horizontal bucket.

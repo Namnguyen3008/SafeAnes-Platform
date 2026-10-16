@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useClinicalReview } from "@/context/ClinicalReviewContext";
-import { PatientContextSummary } from "@/components/common";
 import { useTranslation } from "@/context/LocalizationContext";
 
 export function CaseReviewSummary() {

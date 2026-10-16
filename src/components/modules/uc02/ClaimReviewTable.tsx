@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Clock } from "lucide-react";
 import { useClinicalReview } from "@/context/ClinicalReviewContext";
-import { ProvenanceStatus, ReviewStatus } from "@/types/uc02";
+import { ReviewStatus } from "@/types/uc02";
 import { ProvenanceBadge, SeverityBadge } from "@/components/common";
 import { useTranslation } from "@/context/LocalizationContext";
 

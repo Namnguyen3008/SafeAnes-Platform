@@ -17,7 +17,7 @@ import type { SimulationSnapshot } from "@/simulation/types/replay";
 import type { WaveformSegment } from "@/simulation/types/waveforms";
 import type { WaveformRenderSource } from "@/simulation/types/waveforms";
 import { createClinicalWaveformSource } from "@/simulation/adapters/waveformAdapter";
-import type { UC04VitalDbProjection, VitalDbPrediction } from "@/adapters/uc04VitalDbAdapter";
+import type { UC04VitalDbProjection } from "@/adapters/uc04VitalDbAdapter";
 
 export interface UC04CaseViewModel {
   patientContext: PatientContext;
@@ -231,7 +231,7 @@ export function getUC04VitalDbWorkspaceViewModel(
     inference_contract_mode: "VERIFIED_MODEL_CONTRACT",
     clinical_use: false as const,
   };
-  const score = primaryOutput?.interpreted_output.value ?? null;
+  const score = primaryOutput?.interpreted_output?.value ?? null;
   const timeKeys = new Set<number>();
   for (const series of view.signals) {
     for (const observation of series.observations) timeKeys.add(observation.timestamp);
@@ -248,7 +248,7 @@ export function getUC04VitalDbWorkspaceViewModel(
   };
   const scoreAt = (time: number) => view.predictions.find((item) =>
     item.prediction_time === time && item.horizon_minutes_or_null === 5
-  )?.interpreted_output.value ?? null;
+  )?.interpreted_output?.value ?? null;
   const trendSamples: HemodynamicTrendSample[] = [...timeKeys].sort((a, b) => a - b).map((time) => ({
     timestamp: formatRelativeTime(time),
     map: sampleAt("MAP", time),
@@ -281,7 +281,7 @@ export function getUC04VitalDbWorkspaceViewModel(
     modelId: primaryOutput?.model_id ?? modelMetadata.model_id,
     modelVersion: primaryOutput?.model_version ?? modelMetadata.model_version,
     outputValue: score,
-    outputSemantics: primaryOutput?.interpreted_output.kind ?? modelMetadata.output_semantics,
+    outputSemantics: primaryOutput?.interpreted_output?.kind ?? modelMetadata.output_semantics,
     calibrated: primaryOutput?.calibrated_or_not ?? null,
     task: primaryOutput?.task ?? modelMetadata.task,
     qualityStatus: primaryOutput?.quality ?? "UNKNOWN",
@@ -301,7 +301,7 @@ export function getUC04VitalDbWorkspaceViewModel(
       minute: Number(item.horizon_minutes_or_null),
       riskPercent: null,
       riskLevel: "unavailable",
-      outputValue: item.interpreted_output.value,
+      outputValue: item.interpreted_output?.value ?? null,
     }));
 
   const events: HemodynamicEvent[] = view.events.map((event, index) => ({

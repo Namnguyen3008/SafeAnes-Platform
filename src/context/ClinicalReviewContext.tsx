@@ -4,7 +4,6 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import {
   ClinicalEvent,
   ClinicalClaim,
-  ProvenanceStatus,
   ReviewStatus,
   RejectionReason,
   PatientDemographics,

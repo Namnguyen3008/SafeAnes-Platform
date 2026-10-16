@@ -9,10 +9,6 @@ import {
   Activity,
   Wind,
   ArrowRight,
-  ShieldAlert,
-  AlertTriangle,
-  CheckCircle2,
-  HardDrive,
   HeartPulse,
 } from "lucide-react";
 import { useSafeAnesSimulation } from "@/context/SimulationReplayContext";

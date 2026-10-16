@@ -130,7 +130,7 @@ function SimulationHemodynamicTrendPanel() {
     e: React.MouseEvent<SVGSVGElement>,
     param: string,
     unit: string,
-    points: { x: number; y: number }[],
+    _points: { x: number; y: number }[],
     rawData: { t: string; v: number }[]
   ) => {
     const rect = e.currentTarget.getBoundingClientRect();

@@ -342,7 +342,6 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     } catch (cause) {
       if (sessionRef.current?.session_id !== active.session_id) return;
       setError(errorText(cause));
-      throw cause;
     }
   }, [updateSession]);
 

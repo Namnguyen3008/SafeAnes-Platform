@@ -50,9 +50,6 @@ export function adaptUc01Snapshot(
   const time = formatCaseTime(snapshot.encounter.startedAt, snapshot.simulationTime);
   const phases = mapPhases(uc01.perioperativePhases, snapshot.encounter.startedAt);
   const currentPhase = [...phases].reverse().find((phase) => phase.status === "CURRENT");
-  const batteryValues = snapshot.devices
-    .map((device) => device.batteryPercent)
-    .filter((value): value is number => value !== undefined);
   const latestPrediction = [...snapshot.predictions].sort((left, right) => right.timestamp - left.timestamp)[0];
   const observations = VITALS.map((signal) =>
     toPhysiologicObservation(uc01.signals.find((item) => item.signal === signal)!, snapshot, uc01.devices)
@@ -504,11 +501,6 @@ function displayEventSignal(signal: unknown): string {
 function signalLabel(signal: ClinicalSignal): string {
   const labels: Partial<Record<ClinicalSignal, string>> = { SPO2: "SpO₂", ETCO2: "EtCO₂", CAPNOGRAM: "Capnogram" };
   return labels[signal] ?? signal;
-}
-
-function signalUnit(signal: ClinicalSignal): string {
-  const units: Partial<Record<ClinicalSignal, string>> = { MAP: "mmHg", SBP: "mmHg", DBP: "mmHg", HR: "bpm", SPO2: "%", ETCO2: "mmHg", RR: "/min", BIS: "index" };
-  return units[signal] ?? "—";
 }
 
 function sourceDeviceName(sourceId: string, devices: SimulationDevice[]): string {

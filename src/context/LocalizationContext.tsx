@@ -43,10 +43,8 @@ export function LocalizationProvider({
   initialLocale?: Locale;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
       if (stored === "en" || stored === "vi") {

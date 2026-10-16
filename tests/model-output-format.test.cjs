@@ -77,7 +77,7 @@ test("recorded adapters do not invent a fallback horizon or output semantics", (
   const uc04 = fs.readFileSync(path.join(__dirname, "..", "src", "adapters", "uc04Adapter.ts"), "utf8");
   const uc05 = fs.readFileSync(path.join(__dirname, "..", "src", "adapters", "uc05VitalDbCaseAdapter.ts"), "utf8");
   assert.match(uc04, /horizonMinutes:\s*primaryOutput\?\.horizon_minutes_or_null \?\? null/);
-  assert.match(uc04, /outputSemantics:\s*primaryOutput\?\.interpreted_output\.kind \?\? modelMetadata\.output_semantics/);
+  assert.match(uc04, /outputSemantics:\s*primaryOutput\?\.interpreted_output\??\.kind \?\? modelMetadata\.output_semantics/);
   assert.match(uc05, /horizonMinutes:\s*firstOutput\?\.horizon_minutes_or_null \?\? null/);
 });
 

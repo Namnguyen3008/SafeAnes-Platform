@@ -3,17 +3,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  ShieldAlert,
-  AlertTriangle,
-  Info,
   CheckCircle,
   ExternalLink,
   Check,
-  Filter,
   BellRing,
 } from "lucide-react";
 import { useCase } from "@/context/CaseContext";
-import { ClinicalAlert, AlertSourceModule } from "@/types/clinical";
+import { AlertSourceModule } from "@/types/clinical";
 import { getAlertNavigationUrl } from "@/utils/clinicalNavigation";
 import { SeverityBadge } from "@/components/common";
 import { useTranslation } from "@/context/LocalizationContext";
@@ -70,8 +66,6 @@ export function GlobalAlertRail({ caseId }: GlobalAlertRailProps) {
   const { activeAlerts, acknowledgeAlert } = useCase();
   const { t } = useTranslation("overview");
   const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "ACKNOWLEDGED">("ALL");
-
-  const basePath = `/safeanes/case/${caseId}`;
 
   // Filter alerts based on active selection
   const filteredAlerts = activeAlerts.filter((alert) => {

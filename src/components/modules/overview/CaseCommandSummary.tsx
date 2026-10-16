@@ -3,11 +3,8 @@
 import React from "react";
 import {
   Clock,
-  Activity,
-  Wifi,
   ShieldAlert,
   CheckCircle2,
-  AlertTriangle,
   Radio,
 } from "lucide-react";
 import { useSafeAnesSimulation } from "@/context/SimulationReplayContext";

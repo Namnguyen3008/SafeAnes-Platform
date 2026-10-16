@@ -77,7 +77,7 @@ export function getUC05SimulationViewModel(snapshot: SimulationSnapshot): Respir
       };
     });
 
-  const tabularTrends = trendSeries.slice(-120).reverse().map((sample, index) => ({
+  const tabularTrends = trendSeries.slice(-120).reverse().map((sample) => ({
     id: `respiratory-trend-${sample.timestampMs}`,
     timeStr: sample.timestamp,
     timestamp: sample.timestampMs!,

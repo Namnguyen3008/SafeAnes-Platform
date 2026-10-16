@@ -5,10 +5,6 @@ import {
   FileText,
   SearchCheck,
   Columns2,
-  Maximize2,
-  ChevronRight,
-  ShieldCheck,
-  AlertTriangle,
 } from "lucide-react";
 import { StructuredAnaesthesiaRecord } from "./StructuredAnaesthesiaRecord";
 import { EvidenceInspector } from "./EvidenceInspector";
