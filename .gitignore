@@ -51,3 +51,10 @@ docs/design/figma-cache/*.secret.*
 *.figma-oauth
 keys_vault.json
 **/keys_vault.json
+
+# AI Agent, MCP, & indexing tool metadata
+.serena/
+.gitnexus/
+AGENTS.md
+agents.md
+[aA][gG][eE][nN][tT][sS].[mM][dD]
