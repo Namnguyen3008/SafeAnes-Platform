@@ -5,6 +5,8 @@ export {
   projectTraceSegments,
   timeToX,
   valueToY,
+  waveformPresentationRenderTime,
+  waveformPresentationTimeAt,
   WaveformBuffer,
   WaveformStream,
 } from "./waveformEngine";

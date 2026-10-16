@@ -67,6 +67,29 @@ export function waveformPresentationTimeAt(
   return transition.fromTimeMs + (transition.toTimeMs - transition.fromTimeMs) * progress;
 }
 
+/**
+ * Resolves continuous presentation time for canvas rendering.
+ * During continuous playback, extrapolates smoothly through packet-arrival latency
+ * so the monitor sweep head never stutters or freezes between network intervals.
+ */
+export function waveformPresentationRenderTime(
+  transition: WaveformPresentationTransition,
+  now: number,
+  maxExtrapolationMs: number = 1_500
+): number {
+  if (!Number.isFinite(now)) throw new RangeError("Presentation frame time must be finite.");
+  if (transition.status !== "PLAYING" || transition.durationMs <= 0) {
+    return transition.toTimeMs;
+  }
+  const elapsed = now - transition.startedAt;
+  if (elapsed <= transition.durationMs) {
+    return waveformPresentationTimeAt(transition, now);
+  }
+  const overdueMs = Math.min(elapsed - transition.durationMs, Math.max(0, maxExtrapolationMs));
+  const speed = transition.speed > 0 ? transition.speed : 1;
+  return transition.toTimeMs + overdueMs * speed;
+}
+
 export interface WaveformStreamOptions {
   seed: number;
   signal: WaveformSignal;

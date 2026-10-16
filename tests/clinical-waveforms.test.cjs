@@ -120,6 +120,25 @@ test("presentation time interpolates only across known simulation time and snaps
   ), 1_000);
 });
 
+test("waveform presentation render time extrapolates smoothly during playing and clamps during pauses", () => {
+  const transition = engine.createWaveformPresentationTransition(1_000, 4_000, 60, "PLAYING", 2_000);
+
+  // Before and during transition
+  assert.equal(engine.waveformPresentationRenderTime(transition, 2_000), 1_000);
+  assert.equal(engine.waveformPresentationRenderTime(transition, 2_025), 2_500);
+  assert.equal(engine.waveformPresentationRenderTime(transition, 2_050), 4_000);
+
+  // Extrapolation when network packet is delayed (20ms overdue at 60x speed = 1200ms sim forward)
+  assert.equal(engine.waveformPresentationRenderTime(transition, 2_070), 4_000 + 20 * 60);
+
+  // Clamped extrapolation ceiling (1500ms max overdue)
+  assert.equal(engine.waveformPresentationRenderTime(transition, 2_050 + 2_000), 4_000 + 1_500 * 60);
+
+  // Non-playing status does not extrapolate
+  const paused = engine.createWaveformPresentationTransition(4_000, 4_500, 60, "PAUSED", 3_000);
+  assert.equal(engine.waveformPresentationRenderTime(paused, 3_050), 4_500);
+});
+
 test("ABP cursor selection maps to the visible waveform window, including midnight", () => {
   assert.equal(timeScale.waveformTimeAtRatio(0, "07:16:51", 8_000), "07:16:43");
   assert.equal(timeScale.waveformTimeAtRatio(0.5, "07:16:51", 8_000), "07:16:47");

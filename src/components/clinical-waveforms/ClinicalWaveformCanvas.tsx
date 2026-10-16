@@ -7,6 +7,7 @@ import {
   projectSweepTraceSegments,
   projectTraceSegments,
   timeToX,
+  waveformPresentationRenderTime,
   waveformPresentationTimeAt,
   WaveformStream,
 } from "./waveformEngine";
@@ -62,7 +63,7 @@ interface WaveformPlotRange {
   cursorTimeMs: number;
 }
 
-/** Shared high-density Canvas renderer for the synthetic clinical monitor signals. */
+/** Shared high-density dual-layer Canvas renderer for the clinical monitor signals. */
 export function ClinicalWaveformCanvas({
   source,
   color,
@@ -76,6 +77,7 @@ export function ClinicalWaveformCanvas({
   onTimeSelect,
 }: ClinicalWaveformCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<StreamEntry | null>(null);
   const currentWindowRef = useRef<WaveformWindow>({ startTime: 0, endTime: 0, samples: [] });
@@ -84,6 +86,8 @@ export function ClinicalWaveformCanvas({
   const presentationRef = useRef<PresentationState | null>(null);
   const sweepRef = useRef<SweepPresentationState | null>(null);
   const lastCanonicalTimeRef = useRef<number | null>(null);
+  const lastRenderTimeRef = useRef<number>(source.simulationTimeMs);
+  const lastGridDimensionsRef = useRef<{ width: number; height: number; ratio: number; grid: boolean } | null>(null);
 
   if (!sweepRef.current) sweepRef.current = createInitialSweepState(source);
 
@@ -104,14 +108,37 @@ export function ClinicalWaveformCanvas({
     showCursor,
     sweepMode,
     waitingLabel,
-    renderTimeMs: source.simulationTimeMs,
+    renderTimeMs: lastRenderTimeRef.current,
+  };
+
+  const renderGrid = () => {
+    const gridCanvas = gridCanvasRef.current;
+    const host = hostRef.current;
+    if (!gridCanvas || !host) return;
+    const bounds = host.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const ratio = Math.max(1, window.devicePixelRatio || 1);
+    const last = lastGridDimensionsRef.current;
+    if (
+      last &&
+      last.width === bounds.width &&
+      last.height === bounds.height &&
+      last.ratio === ratio &&
+      last.grid === grid
+    ) {
+      return;
+    }
+    lastGridDimensionsRef.current = { width: bounds.width, height: bounds.height, ratio, grid };
+    drawStaticGridCanvas(gridCanvas, bounds.width, bounds.height, ratio, grid);
   };
 
   useEffect(() => {
     const host = hostRef.current;
     const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d", { alpha: false });
+    const context = canvas?.getContext("2d", { alpha: true });
     if (!host || !canvas || !context) return;
+
+    renderGrid();
 
     let scheduler: ReturnType<typeof createPaintScheduler>;
     const paint = () => {
@@ -120,8 +147,10 @@ export function ClinicalWaveformCanvas({
       const now = window.performance.now();
       const presentation = presentationRef.current;
       const renderTimeMs = presentation
-        ? waveformPresentationTimeAt(presentation.transition, now)
+        ? waveformPresentationRenderTime(presentation.transition, now)
         : state.source.simulationTimeMs;
+      lastRenderTimeRef.current = renderTimeMs;
+
       const stream = streamRef.current?.stream;
       const nextWindow = state.source.recordedSamples
         ? {
@@ -140,9 +169,12 @@ export function ClinicalWaveformCanvas({
           : null,
       };
       drawStateRef.current = drawState;
-      drawWaveform(context, canvas, drawState);
+      drawWaveform(context, canvas, drawState, Boolean(gridCanvasRef.current));
 
-      if (presentation && presentation.transition.durationMs > 0 &&
+      // Continuous 60fps pacing: never starve the scheduler during active playback
+      if (state.source.playbackStatus === "PLAYING") {
+        scheduler.schedule();
+      } else if (presentation && presentation.transition.durationMs > 0 &&
           now < presentation.transition.startedAt + presentation.transition.durationMs) {
         scheduler.schedule();
       }
@@ -155,33 +187,59 @@ export function ClinicalWaveformCanvas({
     scheduleRef.current = scheduler;
 
     let observer: ResizeObserver | null = null;
-    const requestPaint = () => scheduler.schedule();
+    const handleResize = () => {
+      renderGrid();
+      scheduler.schedule();
+    };
     if (typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(requestPaint);
+      observer = new ResizeObserver(handleResize);
       observer.observe(host);
     } else {
-      window.addEventListener("resize", requestPaint);
+      window.addEventListener("resize", handleResize);
     }
     scheduler.schedule();
 
     return () => {
       observer?.disconnect();
-      if (!observer) window.removeEventListener("resize", requestPaint);
+      if (!observer) window.removeEventListener("resize", handleResize);
       scheduler.dispose();
       if (scheduleRef.current === scheduler) scheduleRef.current = null;
     };
   }, [streamKey]);
 
   useEffect(() => {
-    const previousTime = lastCanonicalTimeRef.current ?? source.simulationTimeMs;
+    renderGrid();
+    const now = window.performance.now();
+    const previousCanonical = lastCanonicalTimeRef.current ?? source.simulationTimeMs;
+    const currentRendered = lastRenderTimeRef.current;
+
+    const elapsedSimMs = source.simulationTimeMs - previousCanonical;
+    const seekThresholdMs = Math.max(source.windowMs * 2, (source.playbackSpeed || 1) * 2_000);
+    const isDiscontinuous = elapsedSimMs < 0 || elapsedSimMs > seekThresholdMs;
+    const isPlaying = source.playbackStatus === "PLAYING";
+
+    let fromTimeMs: number;
+    if (isDiscontinuous || !isPlaying) {
+      fromTimeMs = source.simulationTimeMs;
+      lastRenderTimeRef.current = source.simulationTimeMs;
+    } else {
+      const drift = currentRendered - source.simulationTimeMs;
+      // In continuous playback, smoothly anchor new transition to rendered time if within drift tolerance
+      if (Math.abs(drift) <= 1_500 && currentRendered < source.simulationTimeMs) {
+        fromTimeMs = currentRendered;
+      } else {
+        fromTimeMs = source.simulationTimeMs;
+      }
+    }
+
     presentationRef.current = {
       targetTimeMs: source.simulationTimeMs,
       transition: createWaveformPresentationTransition(
-        previousTime,
-        source.simulationTimeMs,
+        fromTimeMs,
+        Math.max(fromTimeMs, source.simulationTimeMs),
         source.playbackSpeed,
         source.playbackStatus,
-        window.performance.now()
+        now
       ),
     };
     lastCanonicalTimeRef.current = source.simulationTimeMs;
@@ -193,7 +251,7 @@ export function ClinicalWaveformCanvas({
       showCursor,
       sweepMode,
       waitingLabel,
-      renderTimeMs: source.simulationTimeMs,
+      renderTimeMs: lastRenderTimeRef.current,
     };
     updateSweepState(sweepRef, source);
     scheduleRef.current?.schedule();
@@ -208,11 +266,7 @@ export function ClinicalWaveformCanvas({
         const ratio = bounds.width > 0
           ? Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width))
           : 1;
-        const now = window.performance.now();
-        const presentation = presentationRef.current;
-        const renderTimeMs = presentation
-          ? waveformPresentationTimeAt(presentation.transition, now)
-          : state.source.simulationTimeMs;
+        const renderTimeMs = lastRenderTimeRef.current;
         const sweepActive = state.sweepMode && sweepRef.current?.mode === "SWEEP";
         onTimeSelect(sweepActive
           ? sweepTimeAtRatio(renderTimeMs, state.source.windowMs, ratio)
@@ -236,8 +290,13 @@ export function ClinicalWaveformCanvas({
       onClick={handleClick}
     >
       <canvas
+        ref={gridCanvasRef}
+        className="absolute inset-0 block h-full w-full pointer-events-none"
+        aria-hidden="true"
+      />
+      <canvas
         ref={canvasRef}
-        className="block h-full w-full"
+        className="absolute inset-0 block h-full w-full"
         role="img"
         aria-label={`${accessibleLabel}, ${source.unit}`}
       />
@@ -245,10 +304,34 @@ export function ClinicalWaveformCanvas({
   );
 }
 
+function drawStaticGridCanvas(
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  ratio: number,
+  grid: boolean
+): void {
+  const pixelWidth = Math.round(width * ratio);
+  const pixelHeight = Math.round(height * ratio);
+  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+    canvas.width = pixelWidth;
+    canvas.height = pixelHeight;
+  }
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) return;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.fillStyle = "#03070A";
+  context.fillRect(0, 0, width, height);
+  if (grid) {
+    drawGrid(context, width, height);
+  }
+}
+
 function drawWaveform(
   context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  state: DrawState & { sweep: WaveformPlotRange | null }
+  state: DrawState & { sweep: WaveformPlotRange | null },
+  hasDualLayer: boolean = true
 ): void {
   const bounds = canvas.getBoundingClientRect();
   if (bounds.width <= 0 || bounds.height <= 0) return;
@@ -261,14 +344,22 @@ function drawWaveform(
     canvas.height = pixelHeight;
   }
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  context.fillStyle = "#03070A";
-  context.fillRect(0, 0, bounds.width, bounds.height);
+
+  if (hasDualLayer) {
+    context.clearRect(0, 0, bounds.width, bounds.height);
+  } else {
+    context.fillStyle = "#03070A";
+    context.fillRect(0, 0, bounds.width, bounds.height);
+  }
 
   context.save();
   context.beginPath();
   context.rect(0, 0, bounds.width, bounds.height);
   context.clip();
-  if (state.grid) drawGrid(context, bounds.width, bounds.height);
+
+  if (!hasDualLayer && state.grid) {
+    drawGrid(context, bounds.width, bounds.height);
+  }
 
   const range = state.sweep ?? getWaveformPlotRange(state.source, null, state.renderTimeMs);
   const plotEnd = range.endTimeMs;
@@ -293,7 +384,7 @@ function drawWaveform(
       eraseGapMs: 80,
     })
     : projectTraceSegments(state.window.samples, projectionOptions);
-  context.lineWidth = 1.65;
+  context.lineWidth = 1.75;
   context.lineJoin = "round";
   context.lineCap = "round";
   context.strokeStyle = state.color;
@@ -306,7 +397,7 @@ function drawWaveform(
       }
       continue;
     }
-    context.globalAlpha = segment.quality === "GOOD" ? 0.96 : 0.72;
+    context.globalAlpha = segment.quality === "GOOD" ? 0.98 : 0.72;
     context.setLineDash(segment.quality === "GOOD" ? [] : [4, 2]);
     context.beginPath();
     context.moveTo(segment.points[0].x, segment.points[0].y);
@@ -398,7 +489,11 @@ function resolveSweepPlotRange(
 ): WaveformPlotRange {
   if (!sweep) return getWaveformPlotRange(source, null, renderTimeMs);
   if (sweep.mode === "SWEEP") {
-    if (renderTimeMs > sweep.cycleStartMs + source.windowMs) {
+    if (renderTimeMs < sweep.cycleStartMs) {
+      sweep.cycleStartMs = source.playbackStatus === "PLAYING"
+        ? renderTimeMs
+        : Math.max(0, renderTimeMs - source.windowMs);
+    } else if (renderTimeMs > sweep.cycleStartMs + source.windowMs) {
       const completedCycles = Math.floor((renderTimeMs - sweep.cycleStartMs) / source.windowMs);
       sweep.cycleStartMs += completedCycles * source.windowMs;
     }
@@ -440,13 +535,15 @@ function drawSweepEraseBar(
   _windowMs: number,
 ): void {
   const x = Math.max(0, Math.min(width, cursorX));
-  // A subtle sweep cursor line matching clinical bedside monitors
-  context.strokeStyle = "rgba(244, 246, 247, 0.28)";
-  context.lineWidth = 1;
+  // A clean, bright sweep cursor line matching clinical bedside monitors
+  context.save();
+  context.strokeStyle = "rgba(244, 246, 247, 0.42)";
+  context.lineWidth = 1.25;
   context.beginPath();
   context.moveTo(Math.min(width - 0.5, x), 0);
   context.lineTo(Math.min(width - 0.5, x), height);
   context.stroke();
+  context.restore();
 }
 
 function sweepTimeAtRatio(renderTimeMs: number, windowMs: number, ratio: number): number {
