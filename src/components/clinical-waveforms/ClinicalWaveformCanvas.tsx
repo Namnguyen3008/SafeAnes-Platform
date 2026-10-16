@@ -8,7 +8,6 @@ import {
   projectTraceSegments,
   timeToX,
   waveformPresentationRenderTime,
-  waveformPresentationTimeAt,
   WaveformStream,
 } from "./waveformEngine";
 import type { ClinicalWaveformSource, WaveformWindow } from "./waveformEngine";
@@ -63,7 +62,11 @@ interface WaveformPlotRange {
   cursorTimeMs: number;
 }
 
-/** Shared high-density dual-layer Canvas renderer for the clinical monitor signals. */
+/**
+ * Shared high-density dual-layer Canvas renderer for clinical monitor signals.
+ * Features Phase 2 OffscreenCanvas Worker thread isolation with automatic
+ * main-thread progressive enhancement fallback.
+ */
 export function ClinicalWaveformCanvas({
   source,
   color,
@@ -79,6 +82,13 @@ export function ClinicalWaveformCanvas({
   const hostRef = useRef<HTMLDivElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Phase 2 Worker thread isolation references
+  const workerRef = useRef<Worker | null>(null);
+  const isWorkerActiveRef = useRef<boolean>(false);
+  const hasTransferredRef = useRef<boolean>(false);
+
+  // In-thread fallback state (Phase 1)
   const streamRef = useRef<StreamEntry | null>(null);
   const currentWindowRef = useRef<WaveformWindow>({ startTime: 0, endTime: 0, samples: [] });
   const drawStateRef = useRef<DrawState | null>(null);
@@ -92,14 +102,24 @@ export function ClinicalWaveformCanvas({
   if (!sweepRef.current) sweepRef.current = createInitialSweepState(source);
 
   const recorded = Boolean(source.recordedSamples);
-  const streamKey = [recorded ? "recorded" : "synthetic", source.seed, source.signal, source.sourceDevice, source.qualitySignal,
-    source.sampleRateHz, source.windowMs, source.receiptDelayMs].join(":");
+  const streamKey = [
+    recorded ? "recorded" : "synthetic",
+    source.seed,
+    source.signal,
+    source.sourceDevice,
+    source.qualitySignal,
+    source.sampleRateHz,
+    source.windowMs,
+    source.receiptDelayMs,
+  ].join(":");
+
   if (!recorded && (!streamRef.current || streamRef.current.key !== streamKey)) {
     streamRef.current = {
       key: streamKey,
       stream: new WaveformStream(source),
     };
   }
+
   drawStateRef.current = {
     source,
     window: currentWindowRef.current,
@@ -132,7 +152,82 @@ export function ClinicalWaveformCanvas({
     drawStaticGridCanvas(gridCanvas, bounds.width, bounds.height, ratio, grid);
   };
 
+  // Phase 2: Initialize Web Worker and OffscreenCanvas on mount
   useEffect(() => {
+    const host = hostRef.current;
+    const canvas = canvasRef.current;
+    if (!host || !canvas) return;
+
+    const canUseWorker =
+      typeof window !== "undefined" &&
+      typeof Worker !== "undefined" &&
+      typeof HTMLCanvasElement !== "undefined" &&
+      typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function" &&
+      !hasTransferredRef.current;
+
+    if (canUseWorker) {
+      try {
+        const bounds = host.getBoundingClientRect();
+        const width = bounds.width > 0 ? bounds.width : 300;
+        const height = bounds.height > 0 ? bounds.height : 150;
+        const ratio = Math.max(1, window.devicePixelRatio || 1);
+
+        const offscreen = canvas.transferControlToOffscreen();
+        hasTransferredRef.current = true;
+
+        const worker = new Worker(new URL("./waveformWorker.ts", import.meta.url), {
+          type: "module",
+        });
+        workerRef.current = worker;
+        isWorkerActiveRef.current = true;
+
+        worker.postMessage(
+          {
+            type: "INIT",
+            payload: {
+              canvas: offscreen,
+              width,
+              height,
+              ratio,
+              source,
+              color,
+              grid: false,
+              showCursor,
+              sweepMode,
+              waitingLabel,
+            },
+          },
+          [offscreen]
+        );
+
+        worker.onerror = (err) => {
+          console.warn("[SafeAnes] Waveform Worker runtime error, falling back:", err);
+        };
+      } catch {
+        isWorkerActiveRef.current = false;
+        workerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (workerRef.current) {
+        try {
+          workerRef.current.postMessage({ type: "DISPOSE" });
+          workerRef.current.terminate();
+        } catch {
+          // ignore cleanup errors during unmount
+        }
+        workerRef.current = null;
+        isWorkerActiveRef.current = false;
+      }
+    };
+  }, []);
+
+  // Main-thread in-thread fallback render loop (Phase 1)
+  useEffect(() => {
+    // When the dedicated worker is running, skip main-thread canvas 2D rendering
+    if (isWorkerActiveRef.current) return;
+
     const host = hostRef.current;
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d", { alpha: true });
@@ -154,10 +249,10 @@ export function ClinicalWaveformCanvas({
       const stream = streamRef.current?.stream;
       const nextWindow = state.source.recordedSamples
         ? {
-          startTime: renderTimeMs - state.source.windowMs,
-          endTime: renderTimeMs,
-          samples: state.source.recordedSamples,
-        }
+            startTime: renderTimeMs - state.source.windowMs,
+            endTime: renderTimeMs,
+            samples: state.source.recordedSamples,
+          }
         : stream?.updateTo(renderTimeMs, state.source.qualityStates) ?? currentWindowRef.current;
       currentWindowRef.current = nextWindow;
       const drawState = {
@@ -171,14 +266,18 @@ export function ClinicalWaveformCanvas({
       drawStateRef.current = drawState;
       drawWaveform(context, canvas, drawState, Boolean(gridCanvasRef.current));
 
-      // Continuous 60fps pacing: never starve the scheduler during active playback
+      // Continuous 60fps pacing
       if (state.source.playbackStatus === "PLAYING") {
         scheduler.schedule();
-      } else if (presentation && presentation.transition.durationMs > 0 &&
-          now < presentation.transition.startedAt + presentation.transition.durationMs) {
+      } else if (
+        presentation &&
+        presentation.transition.durationMs > 0 &&
+        now < presentation.transition.startedAt + presentation.transition.durationMs
+      ) {
         scheduler.schedule();
       }
     };
+
     scheduler = createPaintScheduler(
       (callback) => window.requestAnimationFrame(callback),
       (handle) => window.cancelAnimationFrame(handle),
@@ -207,6 +306,7 @@ export function ClinicalWaveformCanvas({
     };
   }, [streamKey]);
 
+  // Synchronize state and trigger worker / in-thread scheduler
   useEffect(() => {
     renderGrid();
     const now = window.performance.now();
@@ -224,7 +324,6 @@ export function ClinicalWaveformCanvas({
       lastRenderTimeRef.current = source.simulationTimeMs;
     } else {
       const drift = currentRendered - source.simulationTimeMs;
-      // In continuous playback, smoothly anchor new transition to rendered time if within drift tolerance
       if (Math.abs(drift) <= 1_500 && currentRendered < source.simulationTimeMs) {
         fromTimeMs = currentRendered;
       } else {
@@ -254,8 +353,58 @@ export function ClinicalWaveformCanvas({
       renderTimeMs: lastRenderTimeRef.current,
     };
     updateSweepState(sweepRef, source);
+
+    // Forward updates to worker when active
+    if (isWorkerActiveRef.current && workerRef.current) {
+      workerRef.current.postMessage({
+        type: "UPDATE_SOURCE",
+        payload: { source },
+      });
+      workerRef.current.postMessage({
+        type: "UPDATE_CONFIG",
+        payload: { color, showCursor, sweepMode, waitingLabel },
+      });
+      return;
+    }
+
+    // Otherwise trigger in-thread scheduler
     scheduleRef.current?.schedule();
   }, [source, color, grid, showCursor, sweepMode, waitingLabel]);
+
+  // Handle window and container resizing across Worker and DOM
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    const handleResize = () => {
+      renderGrid();
+      const bounds = host.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      const ratio = Math.max(1, window.devicePixelRatio || 1);
+
+      if (isWorkerActiveRef.current && workerRef.current) {
+        workerRef.current.postMessage({
+          type: "RESIZE",
+          payload: { width: bounds.width, height: bounds.height, ratio },
+        });
+      } else {
+        scheduleRef.current?.schedule();
+      }
+    };
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(handleResize);
+      observer.observe(host);
+    } else {
+      window.addEventListener("resize", handleResize);
+    }
+
+    return () => {
+      observer?.disconnect();
+      if (!observer) window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const handleClick: React.MouseEventHandler<HTMLDivElement> = (event) => {
     if (onTimeSelect) {
@@ -373,16 +522,14 @@ function drawWaveform(
     yMin: state.source.yMin,
     yMax: state.source.yMax,
     maxGapMs: state.source.recordedSamples ? Math.max(250, (1_000 / state.source.sampleRateHz) * 6) : undefined,
-    // Bound Canvas path construction to visible pixel density while retaining
-    // first/last and min/max samples per horizontal bucket.
     maxPointsPerSegment: Math.max(4, Math.ceil(bounds.width * ratio * 2)),
   };
   const segments = state.sweep
     ? projectSweepTraceSegments(state.window.samples, {
-      ...projectionOptions,
-      windowMs: state.source.windowMs,
-      eraseGapMs: 80,
-    })
+        ...projectionOptions,
+        windowMs: state.source.windowMs,
+        eraseGapMs: 80,
+      })
     : projectTraceSegments(state.window.samples, projectionOptions);
   context.lineWidth = 1.75;
   context.lineJoin = "round";
@@ -422,9 +569,9 @@ function drawWaveform(
       positiveModulo(state.renderTimeMs, state.source.windowMs),
       0,
       state.source.windowMs,
-      bounds.width,
+      bounds.width
     );
-    drawSweepEraseBar(context, cursorX, bounds.width, bounds.height, state.source.windowMs);
+    drawSweepEraseBar(context, cursorX, bounds.width, bounds.height);
   }
 
   if (state.showCursor && (!state.sweepMode || !state.sweep) &&
@@ -454,7 +601,7 @@ function createInitialSweepState(source: ClinicalWaveformSource): SweepPresentat
 
 function updateSweepState(
   ref: React.MutableRefObject<SweepPresentationState | null>,
-  source: ClinicalWaveformSource,
+  source: ClinicalWaveformSource
 ): void {
   const previous = ref.current;
   if (!previous) {
@@ -485,7 +632,7 @@ function updateSweepState(
 function resolveSweepPlotRange(
   sweep: SweepPresentationState | null,
   source: ClinicalWaveformSource,
-  renderTimeMs: number,
+  renderTimeMs: number
 ): WaveformPlotRange {
   if (!sweep) return getWaveformPlotRange(source, null, renderTimeMs);
   if (sweep.mode === "SWEEP") {
@@ -509,7 +656,7 @@ function resolveSweepPlotRange(
 function getWaveformPlotRange(
   source: ClinicalWaveformSource,
   sweep: SweepPresentationState | null,
-  renderTimeMs: number,
+  renderTimeMs: number
 ): WaveformPlotRange {
   if (sweep?.mode === "SWEEP") {
     const endTimeMs = sweep.cycleStartMs + source.windowMs;
@@ -531,11 +678,9 @@ function drawSweepEraseBar(
   context: CanvasRenderingContext2D,
   cursorX: number,
   width: number,
-  height: number,
-  _windowMs: number,
+  height: number
 ): void {
   const x = Math.max(0, Math.min(width, cursorX));
-  // A clean, bright sweep cursor line matching clinical bedside monitors
   context.save();
   context.strokeStyle = "rgba(244, 246, 247, 0.42)";
   context.lineWidth = 1.25;
