@@ -4,7 +4,13 @@ import logging
 import os
 from typing import Any
 
-import httpx
+try:
+    import httpx
+except ImportError:
+    httpx = None
+import json
+import urllib.request
+import urllib.error
 
 logger = logging.getLogger("safeanes.supabase_repository")
 
@@ -45,12 +51,47 @@ class SupabaseVitalDBRepository:
             "Prefer": "resolution=merge-duplicates",
         }
 
+    def _get(self, url: str) -> list[dict[str, Any]] | dict[str, Any] | None:
+        if httpx is not None:
+            with httpx.Client(headers=self._headers(), timeout=self.timeout) as client:
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    return resp.json()
+                return None
+        req = urllib.request.Request(url, headers=self._headers())
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode("utf-8"))
+        return None
+
+    def _post(self, url: str, data: list[dict[str, Any]]) -> bool:
+        if httpx is not None:
+            with httpx.Client(headers=self._headers(), timeout=self.timeout) as client:
+                resp = client.post(url, json=data)
+                return resp.status_code in (200, 201)
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode("utf-8"),
+            headers=self._headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return resp.status in (200, 201)
+
     def is_connected(self) -> bool:
         """Ping Supabase REST health endpoint."""
         try:
-            with httpx.Client(headers=self._headers(), timeout=5.0) as client:
-                resp = client.get(f"{self.supabase_url}/rest/v1/")
-                return resp.status_code in (200, 404, 401)
+            url = f"{self.supabase_url}/rest/v1/"
+            if httpx is not None:
+                with httpx.Client(headers=self._headers(), timeout=5.0) as client:
+                    resp = client.get(url)
+                    return resp.status_code in (200, 404, 401)
+            req = urllib.request.Request(url, headers=self._headers())
+            try:
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    return resp.status in (200, 404, 401)
+            except urllib.error.HTTPError as exc:
+                return exc.code in (200, 404, 401)
         except Exception:
             return False
 
@@ -58,10 +99,9 @@ class SupabaseVitalDBRepository:
         """List cases registered in Supabase safeanes_cases."""
         try:
             url = f"{self.supabase_url}/rest/v1/safeanes_cases?select=*&order=id.asc"
-            with httpx.Client(headers=self._headers(), timeout=self.timeout) as client:
-                resp = client.get(url)
-                if resp.status_code == 200:
-                    return resp.json()
+            data = self._get(url)
+            if isinstance(data, list):
+                return data
         except Exception as exc:
             logger.warning(f"Supabase list_cases failed: {exc}")
         return []
@@ -70,11 +110,9 @@ class SupabaseVitalDBRepository:
         """Fetch a specific case by id from Supabase."""
         try:
             url = f"{self.supabase_url}/rest/v1/safeanes_cases?id=eq.{case_id}&select=*"
-            with httpx.Client(headers=self._headers(), timeout=self.timeout) as client:
-                resp = client.get(url)
-                if resp.status_code == 200:
-                    rows = resp.json()
-                    return rows[0] if rows else None
+            data = self._get(url)
+            if isinstance(data, list) and data:
+                return data[0]
         except Exception as exc:
             logger.warning(f"Supabase get_case({case_id}) failed: {exc}")
         return None
@@ -87,11 +125,9 @@ class SupabaseVitalDBRepository:
                 f"?case_id=eq.{case_id}&window_start_s=lte.{timestamp_s}&window_end_s=gte.{timestamp_s}"
                 f"&select=*&limit=1"
             )
-            with httpx.Client(headers=self._headers(), timeout=self.timeout) as client:
-                resp = client.get(url)
-                if resp.status_code == 200:
-                    rows = resp.json()
-                    return rows[0] if rows else None
+            data = self._get(url)
+            if isinstance(data, list) and data:
+                return data[0]
         except Exception as exc:
             logger.warning(f"Supabase get_signal_window failed: {exc}")
         return None
@@ -122,9 +158,7 @@ class SupabaseVitalDBRepository:
                 },
             }
             url = f"{self.supabase_url}/rest/v1/safeanes_audit_log"
-            with httpx.Client(headers=self._headers(), timeout=self.timeout) as client:
-                resp = client.post(url, json=[record])
-                return resp.status_code in (200, 201)
+            return self._post(url, [record])
         except Exception as exc:
             logger.debug(f"Failed to record live prediction audit to Supabase: {exc}")
             return False
