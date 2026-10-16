@@ -157,7 +157,7 @@ export function MiniSignalTrendPanel() {
             <div className="w-[68px] flex items-center justify-between shrink-0 pr-2">
             <div className="leading-tight">
               <div className="text-[13px] font-bold text-[#FF3348] tracking-tight">ABP</div>
-              <div className="text-[9px] text-[#AAB4BB] font-mono">{isVitalDb ? (vitalDbProjection?.abp_waveform?.unit || "NOT_RECORDED") : "mmHg"}</div>
+              <div className="text-[9px] text-[#AAB4BB] font-mono">{isVitalDb ? (vitalDbProjection?.abp_waveform?.unit && vitalDbProjection.abp_waveform.unit !== "NOT_RECORDED" ? vitalDbProjection.abp_waveform.unit : "mmHg") : "mmHg"}</div>
             </div>
             <div className="flex flex-col justify-between h-[36px] text-right text-[10px] font-mono text-[#AAB4BB] tabular-nums leading-none">
               <span>{isVitalDb ? formatAxisValue(observedAbpSource?.yMax) : "200"}</span>

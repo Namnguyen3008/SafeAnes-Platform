@@ -14,7 +14,14 @@ export function toRespiratoryVitalDbCaseData(
     const item = latest(name);
     return item && !item.is_missing && item.value !== null && Number.isFinite(item.value) ? item.value : null;
   };
-  const unit = (name: string) => signal(name)?.unit ?? "NOT_RECORDED";
+  const unit = (name: string) => {
+    const raw = signal(name)?.unit?.trim();
+    if (!raw || raw.toUpperCase() === "NOT_RECORDED") {
+      const fallbacks: Record<string, string> = { ETCO2: "mmHg", RR: "/min", SPO2: "%", PR: "/min" };
+      return fallbacks[name.toUpperCase()] ?? "NOT_RECORDED";
+    }
+    return raw;
+  };
   const units = {
     etco2: unit("ETCO2"),
     respiratoryRate: unit("RR"),

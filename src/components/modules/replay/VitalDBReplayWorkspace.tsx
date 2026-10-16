@@ -136,7 +136,15 @@ export function VitalDBReplayWorkspace({ module }: VitalDBReplayWorkspaceProps) 
                         <td className="px-2 py-1.5 font-mono tabular-nums">
                           {observation?.is_missing || observation?.value == null
                             ? (vi ? "TÍN HIỆU KHÔNG KHẢ DỤNG" : "SIGNAL UNAVAILABLE")
-                            : <>{formatValue(observation.value)} <span className="text-safe-text-muted">{observation.unit || series.unit}</span></>}
+                            : (
+                              <>
+                                {formatValue(observation.value)}
+                                {(() => {
+                                  const displayUnit = resolveClinicalDisplayUnit(series.signal ?? series.track_name, observation.unit || series.unit);
+                                  return displayUnit ? <> <span className="text-safe-text-muted">{displayUnit}</span></> : null;
+                                })()}
+                              </>
+                            )}
                         </td>
                         <td className="px-2 py-1.5 font-mono tabular-nums text-safe-text-muted">
                           {observation ? formatCaseTime(observation.timestamp) : "—"}
@@ -209,7 +217,7 @@ export function VitalDBReplayWorkspace({ module }: VitalDBReplayWorkspaceProps) 
                   {replay.trackMetadata.map((track) => (
                     <li key={String(track.track_name)} className="grid grid-cols-[minmax(0,1fr)_max-content] gap-2 border-b border-safe-border-subtle/70 py-1">
                       <span className="min-w-0 break-all font-mono">{String(track.track_name)}</span>
-                      <span className="text-right text-safe-text-muted">{String(track.track_type ?? "UNKNOWN")} · {String(track.unit ?? "NOT_RECORDED")}</span>
+                      <span className="text-right text-safe-text-muted">{String(track.track_type ?? "UNKNOWN")} · {resolveClinicalDisplayUnit(track.signal ?? track.track_name, track.unit) || String(track.unit ?? "NOT_RECORDED")}</span>
                     </li>
                   ))}
                   {replay.trackMetadata.length === 0 && <li className="py-2 text-safe-text-muted">{vi ? "Siêu dữ liệu chưa sẵn sàng." : "Track metadata is not available yet."}</li>}
@@ -322,7 +330,15 @@ export function VitalDBReplayWorkspace({ module }: VitalDBReplayWorkspaceProps) 
                           <td className="px-2 py-1.5 font-mono tabular-nums">
                             {observation?.is_missing || observation?.value == null
                               ? (vi ? "KHÔNG KHẢ DỤNG" : "UNAVAILABLE")
-                              : <>{formatValue(observation.value)} <span className="text-safe-text-muted">{observation.unit ?? track.unit ?? "NOT_RECORDED"}</span></>}
+                              : (
+                                <>
+                                  {formatValue(observation.value)}
+                                  {(() => {
+                                    const displayUnit = resolveClinicalDisplayUnit(track.track_name, observation.unit ?? track.unit);
+                                    return displayUnit ? <> <span className="text-safe-text-muted">{displayUnit}</span></> : null;
+                                  })()}
+                                </>
+                              )}
                           </td>
                           <td className="whitespace-nowrap px-2 py-1.5 font-mono tabular-nums">{observation ? formatCaseTime(observation.timestamp) : "—"}</td>
                           <td className="break-words px-2 py-1.5 text-safe-text-muted">{track.source ?? "NOT_RECORDED"}</td>
@@ -386,3 +402,37 @@ function formatCaseTime(seconds: number): string {
 function formatValue(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
+
+const CLINICAL_SIGNAL_UNIT_MAP: Record<string, string> = {
+  SPO2: "%",
+  PR: "/min",
+  HR: "/min",
+  RR: "/min",
+  ETCO2: "mmHg",
+  MAP: "mmHg",
+  SBP: "mmHg",
+  DBP: "mmHg",
+  ART_MBP: "mmHg",
+  ART_SBP: "mmHg",
+  ART_DBP: "mmHg",
+  CVP: "mmHg",
+  ST_II: "mm",
+  BT: "°C",
+  TEMP: "°C",
+  TOF: "%",
+  BIS: "",
+};
+
+function resolveClinicalDisplayUnit(signalOrTrack: unknown, unit: unknown): string {
+  const clean = typeof unit === "string" ? unit.trim() : "";
+  if (clean && clean.toUpperCase() !== "NOT_RECORDED") {
+    return clean;
+  }
+  if (!signalOrTrack || typeof signalOrTrack !== "string") return "";
+  const key = signalOrTrack.toUpperCase();
+  if (CLINICAL_SIGNAL_UNIT_MAP[key]) return CLINICAL_SIGNAL_UNIT_MAP[key];
+  const subKey = key.split("/").pop() ?? key;
+  if (CLINICAL_SIGNAL_UNIT_MAP[subKey]) return CLINICAL_SIGNAL_UNIT_MAP[subKey];
+  return "";
+}
+
