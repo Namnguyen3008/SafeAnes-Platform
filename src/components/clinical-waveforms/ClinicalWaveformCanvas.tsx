@@ -65,7 +65,8 @@ interface WaveformPlotRange {
 /**
  * Shared high-density dual-layer Canvas renderer for clinical monitor signals.
  * Features Phase 2 OffscreenCanvas Worker thread isolation with automatic
- * main-thread progressive enhancement fallback.
+ * main-thread progressive enhancement fallback, and Phase 3 phosphor glow
+ * aesthetic modeling.
  */
 export function ClinicalWaveformCanvas({
   source,
@@ -531,28 +532,40 @@ function drawWaveform(
         eraseGapMs: 80,
       })
     : projectTraceSegments(state.window.samples, projectionOptions);
-  context.lineWidth = 1.75;
+
   context.lineJoin = "round";
   context.lineCap = "round";
   context.strokeStyle = state.color;
+
   for (const segment of segments) {
     if (segment.points.length < 2) {
       if (segment.points.length === 1) {
         context.beginPath();
-        context.arc(segment.points[0].x, segment.points[0].y, 1, 0, 2 * Math.PI);
-        context.stroke();
+        context.arc(segment.points[0].x, segment.points[0].y, 1.5, 0, 2 * Math.PI);
+        context.fillStyle = state.color;
+        context.fill();
       }
       continue;
     }
-    context.globalAlpha = segment.quality === "GOOD" ? 0.98 : 0.72;
+
     context.setLineDash(segment.quality === "GOOD" ? [] : [4, 2]);
     context.beginPath();
     context.moveTo(segment.points[0].x, segment.points[0].y);
     for (let index = 1; index < segment.points.length; index += 1) {
       context.lineTo(segment.points[index].x, segment.points[index].y);
     }
+
+    // Phase 3: Pass 1 — Outer Phosphor Bloom
+    context.lineWidth = 3.8;
+    context.globalAlpha = segment.quality === "GOOD" ? 0.24 : 0.12;
+    context.stroke();
+
+    // Phase 3: Pass 2 — High-Intensity Focused Core Beam
+    context.lineWidth = 1.65;
+    context.globalAlpha = segment.quality === "GOOD" ? 0.98 : 0.72;
     context.stroke();
   }
+
   if (!segments.some((segment) => segment.points.length >= 2)) {
     context.globalAlpha = 0.9;
     context.fillStyle = "#7F8C94";
@@ -572,6 +585,35 @@ function drawWaveform(
       bounds.width
     );
     drawSweepEraseBar(context, cursorX, bounds.width, bounds.height);
+
+    // Phase 3: Leading Electron Beam Pip at the sweep head tip
+    let headPoint: { x: number; y: number } | null = null;
+    let minHeadDist = 16;
+    for (const segment of segments) {
+      if (segment.points.length > 0) {
+        const lastPt = segment.points[segment.points.length - 1];
+        const dist = Math.abs(lastPt.x - cursorX);
+        if (dist < minHeadDist) {
+          minHeadDist = dist;
+          headPoint = lastPt;
+        }
+      }
+    }
+    if (headPoint) {
+      context.save();
+      context.fillStyle = state.color;
+      context.globalAlpha = 0.38;
+      context.beginPath();
+      context.arc(headPoint.x, headPoint.y, 4.5, 0, 2 * Math.PI);
+      context.fill();
+
+      context.fillStyle = "#FFFFFF";
+      context.globalAlpha = 0.96;
+      context.beginPath();
+      context.arc(headPoint.x, headPoint.y, 1.75, 0, 2 * Math.PI);
+      context.fill();
+      context.restore();
+    }
   }
 
   if (state.showCursor && (!state.sweepMode || !state.sweep) &&
@@ -640,9 +682,10 @@ function resolveSweepPlotRange(
       sweep.cycleStartMs = source.playbackStatus === "PLAYING"
         ? renderTimeMs
         : Math.max(0, renderTimeMs - source.windowMs);
-    } else if (renderTimeMs > sweep.cycleStartMs + source.windowMs) {
-      const completedCycles = Math.floor((renderTimeMs - sweep.cycleStartMs) / source.windowMs);
-      sweep.cycleStartMs += completedCycles * source.windowMs;
+    } else if (renderTimeMs > sweep.cycleStartMs + sourceWindowMs(source)) {
+      const windowMs = sourceWindowMs(source);
+      const completedCycles = Math.floor((renderTimeMs - sweep.cycleStartMs) / windowMs);
+      sweep.cycleStartMs += completedCycles * windowMs;
     }
     return {
       startTimeMs: sweep.cycleStartMs,
@@ -651,6 +694,10 @@ function resolveSweepPlotRange(
     };
   }
   return getWaveformPlotRange(source, null, renderTimeMs);
+}
+
+function sourceWindowMs(src: ClinicalWaveformSource): number {
+  return src.windowMs > 0 ? src.windowMs : 8_000;
 }
 
 function getWaveformPlotRange(
@@ -681,8 +728,21 @@ function drawSweepEraseBar(
   height: number
 ): void {
   const x = Math.max(0, Math.min(width, cursorX));
+  const eraseWidth = Math.min(28, width - x);
+
   context.save();
-  context.strokeStyle = "rgba(244, 246, 247, 0.42)";
+  // Phase 3: Soft trailing erase shadow in front of cursor (smoothly clears older cycle)
+  if (eraseWidth > 1) {
+    const gradient = context.createLinearGradient(x, 0, x + eraseWidth, 0);
+    gradient.addColorStop(0, "rgba(3, 7, 10, 0.92)");
+    gradient.addColorStop(0.35, "rgba(3, 7, 10, 0.65)");
+    gradient.addColorStop(1, "rgba(3, 7, 10, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(x, 0, eraseWidth, height);
+  }
+
+  // Crisp phosphor hairline indicator
+  context.strokeStyle = "rgba(244, 246, 247, 0.45)";
   context.lineWidth = 1.25;
   context.beginPath();
   context.moveTo(Math.min(width - 0.5, x), 0);
@@ -704,19 +764,26 @@ function positiveModulo(value: number, modulus: number): number {
 
 function drawGrid(context: CanvasRenderingContext2D, width: number, height: number): void {
   context.lineWidth = 1;
-  for (let index = 0; index <= 8; index += 1) {
-    const x = (width * index) / 8;
-    context.strokeStyle = index % 4 === 0 ? "rgba(80, 160, 210, 0.14)" : "rgba(80, 160, 210, 0.035)";
+  // Sub-division and major division vertical time ticks (16 columns = 4 major blocks, 12 minor sub-divisions)
+  for (let index = 0; index <= 16; index += 1) {
+    const x = (width * index) / 16;
+    const isMajor = index % 4 === 0;
+    context.strokeStyle = isMajor ? "rgba(80, 160, 210, 0.14)" : "rgba(80, 160, 210, 0.035)";
     context.beginPath();
     context.moveTo(Math.round(x) + 0.5, 0);
     context.lineTo(Math.round(x) + 0.5, height);
     context.stroke();
   }
-  for (let index = 0; index <= 4; index += 1) {
-    const y = (height * index) / 4;
-    context.strokeStyle = index === 0 || index === 4
-      ? "rgba(80, 160, 210, 0.11)"
-      : "rgba(80, 160, 210, 0.05)";
+  // Sub-division and major division horizontal amplitude lines (8 rows)
+  for (let index = 0; index <= 8; index += 1) {
+    const y = (height * index) / 8;
+    const isMajor = index % 2 === 0;
+    const isEdge = index === 0 || index === 8;
+    context.strokeStyle = isEdge
+      ? "rgba(80, 160, 210, 0.12)"
+      : isMajor
+        ? "rgba(80, 160, 210, 0.08)"
+        : "rgba(80, 160, 210, 0.035)";
     context.beginPath();
     context.moveTo(0, Math.round(y) + 0.5);
     context.lineTo(width, Math.round(y) + 0.5);

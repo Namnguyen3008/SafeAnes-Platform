@@ -2,6 +2,7 @@
  * Dedicated Web Worker for OffscreenCanvas clinical waveform rendering.
  * Runs the 60fps continuous sweep clock and canvas path rasterization
  * isolated from the React DOM reconciliation and main-thread network tasks.
+ * Includes Phase 3 CRT/phosphor glow bloom, sweep head pip, and erase gap fade.
  */
 
 import {
@@ -304,9 +305,10 @@ function resolveSweepPlotRange(
       state.cycleStartMs = src.playbackStatus === "PLAYING"
         ? renderTimeMs
         : Math.max(0, renderTimeMs - src.windowMs);
-    } else if (renderTimeMs > state.cycleStartMs + src.windowMs) {
-      const completedCycles = Math.floor((renderTimeMs - state.cycleStartMs) / src.windowMs);
-      state.cycleStartMs += completedCycles * src.windowMs;
+    } else if (renderTimeMs > state.cycleStartMs + sourceWindowMs(src)) {
+      const windowMs = sourceWindowMs(src);
+      const completedCycles = Math.floor((renderTimeMs - state.cycleStartMs) / windowMs);
+      state.cycleStartMs += completedCycles * windowMs;
     }
     return {
       startTimeMs: state.cycleStartMs,
@@ -315,6 +317,10 @@ function resolveSweepPlotRange(
     };
   }
   return getWaveformPlotRange(src, null, renderTimeMs);
+}
+
+function sourceWindowMs(src: ClinicalWaveformSource): number {
+  return src.windowMs > 0 ? src.windowMs : 8_000;
 }
 
 function getWaveformPlotRange(
@@ -391,26 +397,36 @@ function drawWaveformOffscreen(
       })
     : projectTraceSegments(win.samples, projectionOptions);
 
-  ctx.lineWidth = 1.75;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = strokeColor;
+
   for (const segment of segments) {
     if (segment.points.length < 2) {
       if (segment.points.length === 1) {
         ctx.beginPath();
-        ctx.arc(segment.points[0].x, segment.points[0].y, 1, 0, 2 * Math.PI);
-        ctx.stroke();
+        ctx.arc(segment.points[0].x, segment.points[0].y, 1.5, 0, 2 * Math.PI);
+        ctx.fillStyle = strokeColor;
+        ctx.fill();
       }
       continue;
     }
-    ctx.globalAlpha = segment.quality === "GOOD" ? 0.98 : 0.72;
+
     ctx.setLineDash(segment.quality === "GOOD" ? [] : [4, 2]);
     ctx.beginPath();
     ctx.moveTo(segment.points[0].x, segment.points[0].y);
     for (let index = 1; index < segment.points.length; index += 1) {
       ctx.lineTo(segment.points[index].x, segment.points[index].y);
     }
+
+    // Phase 3: Pass 1 — Outer Phosphor Bloom (luminous halo simulating cathode ray tube glow)
+    ctx.lineWidth = 3.8;
+    ctx.globalAlpha = segment.quality === "GOOD" ? 0.24 : 0.12;
+    ctx.stroke();
+
+    // Phase 3: Pass 2 — High-Intensity Core Focused Beam
+    ctx.lineWidth = 1.65;
+    ctx.globalAlpha = segment.quality === "GOOD" ? 0.98 : 0.72;
     ctx.stroke();
   }
 
@@ -433,6 +449,37 @@ function drawWaveformOffscreen(
       cssWidth
     );
     drawSweepEraseBar(ctx, cursorX, cssWidth, cssHeight);
+
+    // Phase 3: Leading Electron Beam Pip at the sweep head tip
+    let headPoint: { x: number; y: number } | null = null;
+    let minHeadDist = 16;
+    for (const segment of segments) {
+      if (segment.points.length > 0) {
+        const lastPt = segment.points[segment.points.length - 1];
+        const dist = Math.abs(lastPt.x - cursorX);
+        if (dist < minHeadDist) {
+          minHeadDist = dist;
+          headPoint = lastPt;
+        }
+      }
+    }
+    if (headPoint) {
+      ctx.save();
+      // Outer colored corona glow
+      ctx.fillStyle = strokeColor;
+      ctx.globalAlpha = 0.38;
+      ctx.beginPath();
+      ctx.arc(headPoint.x, headPoint.y, 4.5, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Incandescent core electron dot
+      ctx.fillStyle = "#FFFFFF";
+      ctx.globalAlpha = 0.96;
+      ctx.beginPath();
+      ctx.arc(headPoint.x, headPoint.y, 1.75, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   if (cursor && (!isSweep || !sweepPlotRange) && renderTimeMs >= plotStart && renderTimeMs <= plotEnd) {
@@ -455,8 +502,21 @@ function drawSweepEraseBar(
   height: number
 ): void {
   const x = Math.max(0, Math.min(width, cursorX));
+  const eraseWidth = Math.min(28, width - x);
+
   ctx.save();
-  ctx.strokeStyle = "rgba(244, 246, 247, 0.42)";
+  // Phase 3: Soft trailing erase shadow in front of cursor (smoothly clears older cycle)
+  if (eraseWidth > 1) {
+    const gradient = ctx.createLinearGradient(x, 0, x + eraseWidth, 0);
+    gradient.addColorStop(0, "rgba(3, 7, 10, 0.92)");
+    gradient.addColorStop(0.35, "rgba(3, 7, 10, 0.65)");
+    gradient.addColorStop(1, "rgba(3, 7, 10, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, 0, eraseWidth, height);
+  }
+
+  // Crisp phosphor hairline indicator
+  ctx.strokeStyle = "rgba(244, 246, 247, 0.45)";
   ctx.lineWidth = 1.25;
   ctx.beginPath();
   ctx.moveTo(Math.min(width - 0.5, x), 0);
