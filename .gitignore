@@ -55,6 +55,10 @@ keys_vault.json
 # AI Agent, MCP, & indexing tool metadata
 .serena/
 .gitnexus/
+.claude/
 AGENTS.md
 agents.md
 [aA][gG][eE][nN][tT][sS].[mM][dD]
+CLAUDE.md
+claude.md
+[cC][lL][aA][uU][dD][eE].[mM][dD]
