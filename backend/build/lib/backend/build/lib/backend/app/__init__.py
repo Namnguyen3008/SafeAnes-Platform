@@ -1,1 +1,0 @@
-"""SafeAnes backend application package."""
