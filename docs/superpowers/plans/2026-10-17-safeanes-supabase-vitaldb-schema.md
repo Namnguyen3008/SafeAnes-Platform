@@ -65,7 +65,7 @@
   Chạy: supabase db reset, supabase test db supabase/tests/database/safeanes_vitaldb.test.sql và supabase db lint --level error
   Kết quả mong đợi: PASS; bốn bảng mới khớp client/ingest contract và clinical policy assertions không đổi. Cần chạy local stack khi Docker khả dụng; chưa dùng remote database làm thay thế.
 
-- [ ] **Step 6: Commit local config, migration và pgTAP tests**
+- [x] **Step 6: Commit local config, migration và pgTAP tests**
 
       git add supabase/config.toml supabase/migrations/20261017085710_safeanes_vitaldb_contract.sql supabase/tests/database/safeanes_vitaldb.test.sql
       git commit -m "feat: add protected Supabase VitalDB schema"
@@ -98,7 +98,7 @@
   Chạy: python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và python -m py_compile scripts/ingest_vitaldb_to_supabase.py
   Kết quả mong đợi: PASS; dry-run không cần database credential, ingest thật không thể dùng anon key để ghi.
 
-- [ ] **Step 5: Commit thay đổi credential ingest**
+- [x] **Step 5: Commit thay đổi credential ingest**
 
       git add scripts/ingest_vitaldb_to_supabase.py backend/tests/test_supabase_vitaldb_ingest.py
       git commit -m "fix: use server credential for VitalDB ingestion"

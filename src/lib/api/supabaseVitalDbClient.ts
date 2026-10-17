@@ -33,6 +33,7 @@ export interface SupabaseCaseRow {
   duration_s: number;
   track_count: number;
   has_waveforms: boolean;
+  review_status?: string | null;
   metadata: {
     cache_status?: string;
     available_signals?: string[];
@@ -41,6 +42,7 @@ export interface SupabaseCaseRow {
       uc05_eligible?: boolean;
     };
     quality_summary?: Record<string, unknown>;
+    valid_windows?: Record<string, unknown>;
     number_of_valid_windows?: Record<string, unknown>;
   } | null;
 }
@@ -54,6 +56,7 @@ export interface SupabaseTrackRow {
   sample_rate_hz: number;
   unit: string;
   duration_s: number;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface SupabaseEventRow {
@@ -81,6 +84,8 @@ export interface SupabaseSignalWindowRow {
   waveforms: {
     capno_preview?: number[];
   };
+  predictions_uc04?: unknown;
+  predictions_uc05?: unknown;
 }
 
 export async function fetchSupabaseCases(): Promise<VitalDbCaseSummary[]> {
