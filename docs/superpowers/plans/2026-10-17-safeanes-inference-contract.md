@@ -210,7 +210,7 @@
 
   Kết quả xác minh cuối: npm run build pass, gồm compile, type check, static generation và postbuild.
 
-- [ ] **Step 4: Smoke test inference trên staging**
+- [ ] **Step 4: Smoke test inference trên production**
 
-  Chạy Lambda smoke script đã cập nhật để xác nhận request thiếu tensors bị từ chối; sau đó gọi UC04/UC05 qua endpoint FastAPI trên Render với cấu hình staging hợp lệ. Xác nhận response có model/version provenance và LIVE_INFERENCE. Không gọi prediction endpoint Lambda từ browser.
-  Trạng thái: chưa chạy vì chưa xác minh được Render staging service và Lambda staging target; không gửi inference tới production.
+  Sau khi Render production và Lambda cùng được cấu hình service token, chạy Lambda smoke script để xác nhận request thiếu tensors bị từ chối; gọi UC04/UC05 qua FastAPI trên Render bằng ca được phép kiểm thử. Xác nhận response có model/version provenance và `LIVE_INFERENCE`; dữ liệu cache phải là `OFFLINE_CACHE`. Không gọi prediction endpoint Lambda từ browser và không dùng input bệnh nhân ngoài ca kiểm thử đã được duyệt.
+  Trạng thái: chưa chạy; Vercel proxy còn trả backend build cũ. Token parity Render/Lambda đã được cấu hình sau deploy lỗi do thiếu token; redeploy production rồi chạy smoke UC04/UC05 và kiểm tra provenance.

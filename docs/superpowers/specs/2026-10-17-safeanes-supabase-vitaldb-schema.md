@@ -58,4 +58,4 @@ Trước khi viết migration triển khai, đọc schema/policies/indexes của
 
 ## Rollout
 
-Chạy migration và RLS tests trên local trước, sau đó staging với schema snapshot và dữ liệu fixture. Chỉ sau khi đối chiếu schema/policy production, xác nhận credential mới ở runner server và nhận phê duyệt triển khai riêng mới áp dụng migration/ingest từ xa. Giữ bản ghi migration và cách rollback cho mọi thao tác production.
+Chạy migration và RLS tests trên local trước. Theo user authorization ngày 2026-10-17, bỏ staging và có thể áp dụng migration production sau khi preflight dữ liệu/quyền đạt; kiểm tra migration history, RLS/grants, và xác nhận policy/schema `clinical_*` không đổi. Migration schema không tự động cho phép ingest: chỉ ingest riêng khi có batch được chọn và credential server-side sẵn sàng. Ghi migration ID và cách rollback tiến tới cho mọi thao tác production.

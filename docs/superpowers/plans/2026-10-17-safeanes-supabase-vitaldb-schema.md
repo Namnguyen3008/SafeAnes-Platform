@@ -138,7 +138,7 @@
       git add tests/supabase-vitaldb-contract.test.cjs src/lib/api/supabaseVitalDbClient.ts scripts/ingest_vitaldb_to_supabase.py supabase/migrations/20261017085710_safeanes_vitaldb_contract.sql
       git commit -m "test: pin VitalDB Supabase data contract"
 
-### Task 4: Thêm database CI và chuẩn bị staging handoff an toàn
+### Task 4: Thêm database CI và chuẩn bị production rollout an toàn
 
 **Files:**
 - Tạo: .github/workflows/supabase-db.yml
@@ -147,7 +147,7 @@
 
 **Interfaces:**
 - Đầu vào: Tasks 1–3 và schema snapshot production đã đọc ở Task 1.
-- Đầu ra: CI tái tạo local schema rồi chạy pgTAP, cùng hướng dẫn operator cấu hình write credential trong runner phía server và kiểm thử staging mà không lộ credential ra browser.
+- Đầu ra: CI tái tạo local schema rồi chạy pgTAP, cùng hướng dẫn operator cấu hình write credential trong runner phía server và triển khai production mà không lộ credential ra browser.
 
 - [x] **Step 1: Viết workflow contract test**
 
@@ -160,16 +160,16 @@
 
 - [x] **Step 3: Thêm CI workflow và hướng dẫn ingest**
 
-  Tạo .github/workflows/supabase-db.yml chạy khi có pull request và push tới main; cố định Supabase CLI setup qua supabase/setup-cli@v1, start stack local, reset database local, chạy pgTAP và database lint. Tài liệu phải ghi bốn bảng, tên biến môi trường bắt buộc, local --dry-run, cách cấu hình secret chỉ phía server, lỗi dự kiến khi thiếu key và staging preflight. Không ghi giá trị credential vào tài liệu.
+  Tạo .github/workflows/supabase-db.yml chạy khi có pull request và push tới main; cố định Supabase CLI setup qua supabase/setup-cli@v1, start stack local, reset database local, chạy pgTAP và database lint. Tài liệu phải ghi bốn bảng, tên biến môi trường bắt buộc, local --dry-run, cách cấu hình secret chỉ phía server, lỗi dự kiến khi thiếu key và production preflight. Không ghi giá trị credential vào tài liệu.
 
 - [x] **Step 4: Chạy toàn bộ database và credential checks local**
 
   Chạy: supabase start, supabase db reset, supabase test db, supabase db lint --level error, python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và node --test tests/supabase-vitaldb-contract.test.cjs
   Kết quả: local reset, pgTAP 82/82, schema lint, ingest pytest 9/9 và Node contract 3/3 PASS; workflow chỉ dùng local commands.
 
-- [x] **Step 5: Chuẩn bị staging decision record nhưng không chạy remote migration**
+- [x] **Step 5: Preflight, áp dụng migration và xác minh production RLS**
 
-  So sánh production schema snapshot chỉ đọc với local migration. Ghi lại conflict, delta table/policy cuối cùng, phương án rollback migration và vị trí cần đặt credential cho staging runner. Dừng trước supabase db push, remote SQL hoặc ingest cho đến khi rollout được ủy quyền riêng.
+  Đã so sánh production schema/policy/data ở chế độ chỉ đọc; counts, orphan rows, required fields, window bounds, review status và snapshot `clinical_*` đạt preflight. Sau user authorization, áp dụng migration bằng Supabase MCP với tên `safeanes_vitaldb_contract_20261017`, version được ghi `20261017155542`. Kiểm tra sau migration xác nhận RLS bật; `anon`/`authenticated` có SELECT nhưng không có write privileges/policies; `service_role` có write; counts giữ nguyên `39/714/104/63`; không có orphan/invalid row; fingerprint policy `clinical_*` không đổi (`dae3007364d1992a5bf7fbae3b04adea`). Không chạy ingest hoặc sửa dữ liệu production.
 
 - [x] **Step 6: Commit CI và tài liệu operator**
 
@@ -186,4 +186,4 @@
 
 Kiểm tra nguồn phát hiện helper có thể dùng lại cache chỉ dựa trên kích thước và tải URL VitalDB không gắn phiên bản dù manifest lưu URL cùng checksum. Helper hiện ưu tiên `source_uri` trong manifest, kiểm tra size/SHA-256 trước khi dùng lại cache và chỉ thay cache sau khi file tạm được xác minh; nếu tải hoặc kiểm tra thất bại, cache cũ được giữ nguyên.
 
-Đã thêm test cho cache hợp lệ, thay cache sai bằng nội dung đã xác minh và giữ cache cũ khi checksum sai. Ingest pytest đạt 9/9; toàn backend đạt 218 passed, 12 skipped. Local pgTAP/reset/database lint từng pass; Docker engine hiện không hoạt động nên chưa rerun. Không chạy staging hoặc remote migration.
+Đã thêm test cho cache hợp lệ, thay cache sai bằng nội dung đã xác minh và giữ cache cũ khi checksum sai. Ingest pytest đạt 9/9; toàn backend đạt 218 passed, 12 skipped. Local pgTAP/reset/database lint từng pass. Production preflight 2026-10-17: `safeanes_cases/tracks/events/signal_windows` có `39/714/104/63` rows; không có orphan row, null required field, review status hoặc time-bound vi phạm. Migration version `20261017155542` đã áp dụng; quyền RLS/grants sau migration đạt contract; row counts giữ nguyên và fingerprint năm policy `clinical_*` không đổi.

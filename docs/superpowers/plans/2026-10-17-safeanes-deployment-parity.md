@@ -18,7 +18,7 @@
 - Giữ signal-file cache production ở giá trị Blueprint 24; code default chỉ là giá trị dự phòng cho môi trường phát triển.
 - Không để secret trong NEXT_PUBLIC_*, giá trị Blueprint được commit, image layer, log hoặc commit.
 - Xác minh trạng thái auto-deploy của Vercel và Render; xem Lambda là release ECR/container thủ công qua aws/scripts/deploy_lambda.py trừ khi xác minh được automation đang hoạt động.
-- Trong quá trình thực hiện plan này, không deploy production, sửa platform secret hoặc cập nhật Lambda live nếu chưa có ủy quyền riêng.
+- Người dùng đã ủy quyền rollout production trực tiếp ngày 2026-10-17; không dùng staging làm target. Chỉ cập nhật platform secret hoặc Lambda khi preflight xác nhận đúng production service và token inference đồng bộ; dừng rollout nếu không truy cập được đúng workspace hoặc health gate thất bại.
 
 ## Review Focus — Trọng tâm review
 
@@ -158,7 +158,7 @@
 
 - [x] **Step 3: Cập nhật smoke script và thêm release runbook**
 
-  Làm cho aws/scripts/test_lambda_inference.py dừng sớm nếu thiếu biến môi trường service token, chỉ gửi token trong Authorization header và không in token. Trong runbook, ghi health route hiện có /api/v1/health/live, readiness route /api/v1/health/ready, inference staging qua FastAPI, Lambda health endpoint, cách xác minh auto-deploy Vercel/Render, release thủ công bằng aws/scripts/deploy_lambda.py, các kiểm tra thành công và rollback về deploy Vercel/Render cùng Lambda digest gần nhất đã ghi nhận.
+  Làm cho aws/scripts/test_lambda_inference.py dừng sớm nếu thiếu biến môi trường service token, chỉ gửi token trong Authorization header và không in token. Trong runbook, ghi health route hiện có /api/v1/health/live, readiness route /api/v1/health/ready, inference production qua FastAPI, Lambda health endpoint, cách xác minh auto-deploy Vercel/Render, release thủ công bằng aws/scripts/deploy_lambda.py, các kiểm tra thành công và rollback về deploy Vercel/Render cùng Lambda digest gần nhất đã ghi nhận.
 
 - [x] **Step 4: Validate runbook và smoke script**
 
@@ -170,45 +170,47 @@
       git add docs/operations/SAFEANES_DEPLOYMENT_RUNBOOK.md aws/scripts/test_lambda_inference.py backend/tests/test_deployment_config.py
       git commit -m "docs: document SafeAnes release verification"
 
-### Task 5: Xác thực đường phát hành trên staging
+### Task 5: Phát hành và xác thực production
 
 **Files:**
 - Chỉ đọc: cấu hình và log Render service
 - Chỉ đọc: trạng thái deployment Vercel
 - Chỉ đọc: Lambda function image digest và readiness
-- Tạo sau khi staging smoke test hoàn tất: docs/operations/SAFEANES_STAGING_RELEASE_REPORT.md
+- Tạo sau khi production smoke test hoàn tất: docs/operations/SAFEANES_PRODUCTION_RELEASE_REPORT.md
 
 **Interfaces:**
-- Đầu vào: Tasks 1–4 và môi trường staging đã cấu hình secret được duyệt.
-- Đầu ra: Báo cáo staging release có service build IDs, Lambda image digest, endpoint status, inference source/provenance và tham chiếu rollback.
+- Đầu vào: Tasks 1–4, user authorization production ngày 2026-10-17, CI xanh và preflight xác nhận đúng production resources.
+- Đầu ra: Báo cáo production release có service build IDs, Lambda image digest, endpoint status, inference source/provenance và tham chiếu rollback.
 
-- [ ] **Step 1: Xác minh cấu hình staging trước deploy**
+- [ ] **Step 1: Preflight production và ghi rollback point**
 
-  Xác nhận Render có host cụ thể, /models, cache value 24 và service token; Lambda có token khớp cùng image digest mong muốn; Vercel trỏ về Render API. Không hiển thị hoặc export giá trị secret.
+  Chạy lại CI trên đúng `main` SHA. Xác minh Render production service `safeanes-backend` thuộc đúng workspace, theo dõi nhánh `main`, host `/models`, cache 24 và có `SAFEANES_INFERENCE_SERVICE_TOKEN`; chỉ đọc trạng thái có/không, không đọc/ghi secret qua log. Xác minh Vercel production trỏ về đúng Render API và Lambda `safeanes-inference` có cùng token, URL/config đang phục vụ. Ghi lại Render/Vercel deployment IDs và Lambda resolved image digest làm rollback point. Với Supabase, xác nhận bốn bảng VitalDB, quyền/policies, không orphan/invalid row và không đổi `clinical_*`. Nếu không truy cập được đúng Render workspace hoặc chưa thể đồng bộ token, dừng trước khi publish Lambda.
 
-- [ ] **Step 2: Deploy candidate lên staging**
+- [ ] **Step 2: Triển khai release production từ main**
 
-  Chỉ cho auto-deploy Vercel và Render chạy sau khi CI pass; chạy release script Lambda chỉ với staging function. Ghi lại từng build ID/digest.
+  Supabase migration đã áp dụng và xác minh ở version `20261017155542`. Sau khi CI xanh, để Vercel/Render auto-deploy commit `main`; xác minh cả hai deploy trỏ cùng release. Sau khi service token đã khớp ở Render/Lambda, chạy `python aws/scripts/deploy_lambda.py --function-name safeanes-inference` để phát hành ECR image theo digest bất biến. Không tạo staging resource và không dùng `:latest` làm rollback reference.
 
-- [ ] **Step 3: Chạy readiness và end-to-end smoke checks trên staging**
+- [ ] **Step 3: Chạy health, inference và replay smoke trên production**
 
-  Xác nhận Vercel /safeanes trả 200; Render liveness/readiness healthy; inference UC04/UC05 qua FastAPI trả LIVE_INFERENCE; input/token thiếu trả lỗi rõ ràng; replay SSE vẫn phát data.
+  Xác nhận Vercel `/safeanes` trả 200; Render liveness/readiness healthy và build ID mới; Lambda `/health` trả 200; request thiếu/sai token hoặc tensor bị từ chối; UC04/UC05 qua FastAPI trả đúng model/version provenance cùng `LIVE_INFERENCE`; offline data vẫn mang `OFFLINE_CACHE`; playback/SSE tiếp tục chạy khi inference chậm, lỗi hoặc generation cũ bị loại. Không chấp nhận sample/fallback prediction.
 
-- [ ] **Step 4: Dừng rollout khi có lỗi**
+- [ ] **Step 4: Rollback production khi bất kỳ gate nào lỗi**
 
-  Giữ production nguyên trạng. Dùng runbook rollback staging về deploy/image trước đó và ghi lại kiểm tra thất bại.
+  Dừng bước tiếp theo. Khôi phục Vercel/Render về deployment đã ghi; cập nhật Lambda về ECR digest cũ đã ghi và chờ function ổn định. Với migration, giữ dữ liệu/cột additive; nếu cần đảo policy, dùng migration tiến tới đã review, tuyệt đối không phục hồi quyền ghi `anon`/`authenticated` rộng. Chạy lại health/readiness trước khi kết thúc rollback.
 
-- [ ] **Step 5: Ghi nhận staging report và commit khi repository yêu cầu**
+- [ ] **Step 5: Ghi nhận production release report**
 
-  Tạo docs/operations/SAFEANES_STAGING_RELEASE_REPORT.md từ các build IDs, digest, kết quả endpoint, provenance và rollback reference đã xác minh. Không đưa secret vào báo cáo.
+  Tạo `docs/operations/SAFEANES_PRODUCTION_RELEASE_REPORT.md` từ SHA đã deploy, Vercel/Render deployment IDs/build IDs, Lambda image digest, migration ID, endpoint/smoke results, provenance và rollback reference. Không đưa giá trị secret hoặc dữ liệu bệnh nhân vào báo cáo.
 
-      git add docs/operations/SAFEANES_STAGING_RELEASE_REPORT.md
-      git commit -m "docs: record SafeAnes staging verification"
+      git add docs/operations/SAFEANES_PRODUCTION_RELEASE_REPORT.md
+      git commit -m "docs: record SafeAnes production release"
 
-Trạng thái staging ngày 2026-10-17 (xác minh lại qua Codex MCP):
+Trạng thái production ngày 2026-10-17 (cập nhật sau khi xác minh Render):
 
-- Render workspace `My Workspace` đã được xác nhận; cả `mcp__render` và Render plugin đều trả `null` khi liệt kê service, kể cả preview service.
-- Vercel project `safeanes` tồn tại; 20 deployment gần nhất được truy vấn đều là `READY` trên `production`/`main`; truy vấn riêng `target=preview` trả 0 deployment.
-- AWS CLI đã dùng được sau khi loại bỏ đúng UTF-8 BOM đầu file trong `~/.aws/config` và `~/.aws/credentials`; không thay giá trị cấu hình hay credential. STS xác thực thành công ở `ap-southeast-1`. AWS chỉ trả về function `safeanes-inference` và keepalive cùng ECR repo `safeanes-inference`; function inference Active nhưng không có alias, tag phân biệt stage, hay environment variables. Image URI đang là `:latest`; digest hiện tại là `sha256:6632c0df333393cf0a15274ec1a4cba61ae93889caff3e76f9cc3318fbf2fe6b`, trùng `CodeSha256`. Không có function staging riêng được nhận diện. Contract code local yêu cầu `SAFEANES_INFERENCE_SERVICE_TOKEN` và fail-closed 503 khi biến này thiếu; vì image revision chưa được xác minh độc lập, không gọi function inference này.
+- GitHub `origin/main` và worktree đều ở `778f2d31ea0708062db4241eae1d3860b8d659fd`; commit đã được push trước đó.
+- Vercel production deployment `dpl_2LjnyXNUYabyKYAnpLhWL1QtaPCa` ở trạng thái `READY` cho SHA trên. `/safeanes` và API readiness qua proxy trả 200, nhưng payload backend vẫn báo build ID cũ `f7c50dc542e6f8369377ff48aebc2a3f3c28bd3355074fff452fd8036830b0aa`.
+- Render API key hiện xác thực đúng workspace `Nguyễn Văn's workspace` (`tea-db3r7aqj9qps738oico0`). Production service `safeanes-backend` là `srv-db5jpkijnfac73aocevg`, theo dõi nhánh `main` của `Namnguyen3008/SafeAnes-Platform`. Deploy `dep-db9p2pbm8hqs73anfnq0` build thành công nhưng `update_failed`; runtime log xác nhận FastAPI thoát với `ValueError` vì thiếu `SAFEANES_INFERENCE_SERVICE_TOKEN` khi remote inference bật. Token parity hiện đã được cấu hình ở Render và Lambda; service vẫn đang chạy deployment trước đó `dep-db9da9m90tus73btuo5g` từ SHA `dcf76389288d3ce205e78a1df2b7b5950955a029` cho tới deploy tiếp theo.
+- AWS `ap-southeast-1`: `safeanes-inference` Active, không alias; image URI mutable `:latest`, digest đang chạy `sha256:6632c0df333393cf0a15274ec1a4cba61ae93889caff3e76f9cc3318fbf2fe6b`; service token đã được cấu hình. `/health` trả 200. Cần phát hành image theo digest bất biến theo release plan sau khi kiểm tra CI và Render/Vercel deployment.
+- Supabase project `nntxlqchytvfmutmixea`: migration `safeanes_vitaldb_contract_20261017` (version `20261017155542`) đã áp dụng và xác minh. Counts vẫn là `39/714/104/63`; RLS bật; `anon`/`authenticated` đọc được nhưng không ghi; `service_role` ghi được; không orphan/invalid row. Snapshot năm policy `clinical_*` giữ cùng fingerprint trước/sau.
 
-Không có staging target để chạy các bước 1–5. Giữ nguyên các bước này ở trạng thái chưa hoàn tất; không dùng production làm staging, không tạo service/function mới và không trigger deploy cho tới khi staging target cùng quyền truy cập được cấu hình.
+Các bước 1–5 là production gates và chưa được đánh dấu hoàn tất. Supabase migration và token parity Render/Lambda đã hoàn tất; deploy Render mới chưa được kích hoạt lại. Tiếp tục phát hành `main`, xác minh Vercel trỏ tới build backend mới, rồi chạy inference và replay smoke.

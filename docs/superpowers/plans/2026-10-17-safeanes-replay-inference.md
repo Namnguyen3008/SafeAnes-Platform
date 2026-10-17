@@ -150,7 +150,7 @@
 
 **Interfaces:**
 - Đầu vào: Tasks 1–3 và contract prepared-input thật từ plan inference.
-- Đầu ra: Kiểm thử local lặp lại được cùng checklist staging chứng minh replay controls, live result, cache label và generation filtering hoạt động end-to-end.
+- Đầu ra: Kiểm thử local lặp lại được cùng checklist production chứng minh replay controls, live result, cache label và generation filtering hoạt động end-to-end.
 
 - [x] **Step 1: Chạy backend scheduler và SSE tests tập trung**
 
@@ -169,7 +169,7 @@
 
   Kết quả xác minh trước đây: 6/6 test pass (52.1s) sau khi khởi động local Next/FastAPI. Đã sửa StrictMode cleanup cho worker sau OffscreenCanvas transfer; assertion network chọn một trong hai status UI báo cùng lỗi. Lần rerun không có API service dừng ở BACKEND_UNAVAILABLE, nên không đánh giá hành vi UI.
 
-- [ ] **Step 4: Smoke test staging sau khi inference contract đã được triển khai**
+- [ ] **Step 4: Smoke test replay trên production sau khi inference contract đã được triển khai**
 
-  Replay một case, pause, seek, chuyển case, resume và reconnect stream. Xác nhận chỉ PLAYING mới schedule work, không có stale generation event, inference chậm/lỗi không làm trễ waveform SSE data.
-  Trạng thái: chưa chạy vì chưa xác minh được Render staging service hoặc Lambda staging access; không chạy smoke trên production.
+  Dùng case kiểm thử được phép; replay, pause, seek, đổi case, resume và reconnect stream. Xác nhận chỉ `PLAYING` mới schedule work, không có stale-generation event, inference chậm/lỗi không làm trễ waveform SSE data, live result mang `LIVE_INFERENCE` và cache vẫn `OFFLINE_CACHE`.
+  Trạng thái: chưa chạy production smoke; Render API đã xác thực đúng workspace và Render/Lambda token parity đã được cấu hình. Redeploy production trước, sau đó kiểm thử replay qua FastAPI. Không đánh dấu release hoàn tất nếu inference/live replay chưa chạy qua FastAPI.

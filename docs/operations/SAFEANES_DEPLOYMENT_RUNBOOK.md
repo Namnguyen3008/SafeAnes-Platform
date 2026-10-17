@@ -1,87 +1,67 @@
-# SafeAnes deployment and release runbook
+# SafeAnes production deployment runbook
 
-This runbook describes the release path and the checks required before a SafeAnes environment is treated as healthy. The request path is **browser → Vercel frontend/proxy → FastAPI on Render → Lambda inference**. The browser must never call the Lambda Function URL directly; the service token belongs only to server-side services.
+Luồng production: **browser → Vercel frontend/API proxy → FastAPI trên Render → Lambda inference**. Browser không gọi trực tiếp Lambda Function URL. Dự án không dùng staging; rollout đi thẳng production theo các gate bên dưới.
 
-## Release order
+## Thứ tự phát hành
 
-1. Open a pull request and wait for the `SafeAnes CI` workflow to pass. It builds the frontend, checks the selected backend contracts, and builds both container images without pushing or deploying them.
-2. Merge to `main` only after review. Vercel deploys from its linked Git branch when auto-deploy is enabled. The Render Blueprint sets `autoDeployTrigger: commit`; verify the service is watching the intended branch and that the deploy completed successfully.
-3. Release the Lambda image explicitly after CI. Record the Git build ID, ECR image digest, Lambda function name, and resulting deployment IDs before running smoke checks.
-4. Run the liveness, readiness, authenticated Lambda contract, and full replay checks below. Promote or announce the release only when each check passes.
+1. Chạy CI trên đúng SHA dự định phát hành. CI phải build frontend, chạy các backend contract tests và build Docker cho FastAPI cùng Lambda; workflow CI không push image hay deploy.
+2. Trước khi thay đổi production, ghi SHA, Vercel/Render deployment IDs/build IDs, Lambda Code.ResolvedImageUri và migration hiện có để làm rollback point. Xác nhận Render service/workspace chính xác, theo dõi main, model root /models, host allowlist cụ thể, signal cache 24; kiểm tra trạng thái có/không của secret mà không đọc giá trị.
+3. Áp dụng migration Supabase đã được review bằng migration API sau khi preflight schema/data/policies đạt. Xác nhận migration history, RLS/grants và chính sách clinical_* trước khi tiếp tục. Không ingest VitalDB trong bước deploy schema.
+4. Merge/push release lên GitHub main. Để Vercel và Render auto-deploy theo cấu hình của service; xác nhận chúng chạy cùng SHA mới. Thay đổi environment variable trên Render không tự tạo deploy; nếu không có commit mới, trigger manual deploy sau khi xác minh cấu hình.
+5. Chỉ sau khi SAFEANES_INFERENCE_SERVICE_TOKEN đã được cấu hình cùng giá trị trong secret store của Render và Lambda, phát hành Lambda bằng ECR digest bất biến. Dừng nếu không kiểm chứng được production target hoặc token parity.
+6. Chạy health/readiness, auth-contract, UC04/UC05 live inference và replay SSE smoke. Chỉ công bố release khi tất cả gate đều đạt và có báo cáo không chứa secret/PHI.
 
-The current CI workflow excludes `test_uc05_ready_status_serves_eligible_fixed_window_contract_output` because the checked-in UC05 `config.json` digest does not match the model registry. Artifact integrity validation remains enabled. Treat model readiness and a successful staging inference as release gates until that artifact mismatch is resolved.
+## Biến môi trường và credential
 
-## Server-side configuration and secrets
+Các giá trị phải nằm trong secret/environment store phía server, không commit, không đưa vào NEXT_PUBLIC_*, Docker build args, URL, logs hay báo cáo.
 
-Configure these values in their platform secret/environment settings. Do not commit secret values, put them in a `NEXT_PUBLIC_*` variable, include them in Docker build args, or copy them into logs or release reports.
-
-| Service | Setting | Purpose |
+| Thành phần | Tên biến | Mục đích |
 | --- | --- | --- |
-| Vercel | `SAFEANES_API_URL` | FastAPI base URL, normally the Render backend URL. |
-| Vercel | `SAFEANES_BACKEND_API_TOKEN` | Server-side authorization from the Vercel API proxy to FastAPI. |
-| Render | `SAFEANES_INFERENCE_SERVICE_TOKEN` | Bearer token used by FastAPI when it calls Lambda. The Blueprint declares it as an unsynchronized secret. |
-| Lambda | `SAFEANES_INFERENCE_SERVICE_TOKEN` | Expected bearer token for `/predict/{model}` requests. It must match Render's value, supplied through the approved secret process. |
+| Render operator/API | RENDER_API_KEY | Xác thực Render API; chỉ dùng để quản trị tài nguyên, không dùng làm token inference của ứng dụng. Đọc từ process environment, không in ra terminal. |
+| Vercel | SAFEANES_API_URL | Base URL của FastAPI trên Render. |
+| Vercel | SAFEANES_BACKEND_API_TOKEN | Server-side auth từ Vercel proxy tới FastAPI. |
+| Render | SAFEANES_INFERENCE_SERVICE_TOKEN | Bearer token FastAPI gửi tới Lambda. |
+| Lambda | SAFEANES_INFERENCE_SERVICE_TOKEN | Expected bearer token cho endpoint prediction; phải khớp với Render. |
+| Server-side ingest runner | SUPABASE_SERVICE_ROLE_KEY | Chỉ dùng khi vận hành ingest riêng; không cấp cho browser/client. |
 
-The Lambda smoke script reads `SAFEANES_INFERENCE_SERVICE_TOKEN` from its process environment and sends it only as an `Authorization: Bearer` header. It fails before making a request when the variable is absent. Never paste its value into a command line argument.
+Smoke script đọc SAFEANES_INFERENCE_SERVICE_TOKEN từ process environment và chỉ gửi trong Authorization: Bearer. Script dừng trước request khi thiếu token; không truyền token qua CLI argument.
 
-## Lambda image release
+## Phát hành Lambda
 
-The release helper builds the image, pushes a build-specific ECR tag, resolves the immutable `sha256` digest, and updates the named function to that digest. It requires Docker, AWS CLI credentials with the needed ECR/Lambda permissions, and the repository's configured AWS account and region. `SAFEANES_BUILD_ID` is optional; when unset, the helper uses the current Git commit ID.
+Helper aws/scripts/deploy_lambda.py build image, push tag theo build ID, lấy digest SHA-256 và cập nhật function bằng reference bất biến repository@sha256:.... Cần Docker daemon, AWS CLI credentials có quyền ECR/Lambda và đúng AWS account/region. Luôn chỉ rõ production function:
 
-Always select a staging function explicitly for staging. The default function remains `safeanes-inference`, so omitting `--function-name` can update the default environment.
+    $env:SAFEANES_BUILD_ID = (git rev-parse --short=12 HEAD).Trim()
+    python aws/scripts/deploy_lambda.py --function-name safeanes-inference
 
-```powershell
-$env:SAFEANES_BUILD_ID = (git rev-parse --short=12 HEAD).Trim()
-python aws/scripts/deploy_lambda.py --function-name safeanes-inference-staging
-```
+Trước khi phát hành, lưu image reference/digest hiện hành để rollback:
 
-Record the printed build ID, `sha256` digest, and immutable ECR reference. The helper does not print the service token. Do not run it against a production function until the production release is separately approved.
+    aws lambda get-function --function-name safeanes-inference --region ap-southeast-1 --query 'Code.ResolvedImageUri' --output text
 
-Before release, capture the currently deployed Lambda image reference for rollback:
+Không deploy Lambda nếu Render chưa có cùng service token. Không dùng tag latest để xác định release hoặc rollback.
 
-```powershell
-aws lambda get-function `
-  --function-name safeanes-inference-staging `
-  --region ap-southeast-1 `
-  --query 'Code.ResolvedImageUri' `
-  --output text
-```
+## Health và production smoke
 
-## Health and smoke checks
+    Invoke-WebRequest -Uri "https://<vercel-production-host>/safeanes" -UseBasicParsing
+    Invoke-RestMethod -Uri "https://<render-production-host>/api/v1/health/live"
+    Invoke-RestMethod -Uri "https://<render-production-host>/api/v1/health/ready"
 
-Use the Vercel deployment URL and the backend URL from the deployment configuration; do not infer that a build succeeded from the URL alone.
+Frontend và liveness phải trả HTTP 200. Readiness phải xác nhận service/model sẵn sàng cho UC04/UC05; process HTTP sống không đồng nghĩa model đã nạp được. Backend response phải chứa build ID của SHA vừa deploy. Kiểm tra Lambda /health trả 200; request thiếu/sai token phải bị từ chối trước khi gọi model.
 
-```powershell
-Invoke-WebRequest -Uri "https://safeanes.vercel.app/safeanes" -UseBasicParsing
-Invoke-RestMethod -Uri "https://<render-host>/api/v1/health/live"
-Invoke-RestMethod -Uri "https://<render-host>/api/v1/health/ready"
-```
+Với case kiểm thử được phép, gọi UC04/UC05 qua UI/API FastAPI và xác nhận response có model/version provenance cùng source LIVE_INFERENCE. Cached view giữ source OFFLINE_CACHE; lỗi inference không được che bằng prediction cache, sample hoặc điểm cố định. Khi replay, pause/seek/chuyển case/resume/reconnect để xác nhận chỉ trạng thái PLAYING schedule inference, generation cũ bị loại và waveform/SSE vẫn tiến triển khi inference chậm/lỗi. Không gửi dữ liệu bệnh nhân thật ngoài phạm vi đã được cho phép.
 
-Require HTTP 200 for the frontend and liveness route. Readiness must report the service ready and UC04/UC05 inference availability; a live HTTP process alone does not mean model artifacts loaded successfully. If readiness is false or an expected model is missing, stop and inspect the backend deploy logs and artifact checksums.
-
-The Lambda smoke script checks Lambda `/health` and verifies that authenticated UC04/UC05 requests with missing prepared tensors are rejected with `PREPARED_TENSORS_REQUIRED`. This proves the auth and no-fabricated-prediction contract; it is not a positive model inference test.
-
-```powershell
-# Populate this process variable from the approved secret store without echoing it.
-python aws/scripts/test_lambda_inference.py --url "https://<staging-lambda-function-url>/"
-```
-
-For positive inference, use the staging SafeAnes UI with an approved eligible replay case. Start replay and verify UC04 and UC05 results arrive through the FastAPI/SSE path with source `LIVE_INFERENCE`; a cached result must remain labelled `OFFLINE_CACHE`. Confirm waveform/replay SSE continues to advance while inference runs. A missing token, rejected input, unavailable model, or upstream error must be visible as an error and must never be represented by a sample prediction.
+Lambda smoke script chỉ xác nhận health/auth và việc request thiếu prepared tensors bị từ chối; đó không phải positive model inference. Positive inference phải đi qua FastAPI.
 
 ## Rollback
 
-Stop promotion if any health, readiness, authenticated contract, live inference, provenance, or replay SSE check fails. Keep production unchanged while diagnosing a staging failure.
+Dừng rollout ở bất cứ gate nào không đạt. Ghi lại failed SHA, build/deploy ID và gate lỗi trước khi rollback.
 
-- **Vercel:** use the deployment dashboard to promote the last known-good deployment for the same project and environment.
-- **Render:** use the service dashboard to roll back to the last known-good deploy, or redeploy the reviewed commit that produced it.
-- **Lambda:** use the previously recorded immutable ECR digest, never a mutable `latest` tag:
+- Vercel: promote deployment production gần nhất đã được xác minh.
+- Render: rollback service về deployment production đã lưu hoặc redeploy đúng SHA đã review.
+- Lambda: cập nhật function về immutable ECR digest đã lưu, rồi chờ ổn định:
 
-```powershell
-aws lambda update-function-code `
-  --function-name safeanes-inference-staging `
-  --image-uri "127091441306.dkr.ecr.ap-southeast-1.amazonaws.com/safeanes-inference@sha256:<previous-digest>" `
-  --region ap-southeast-1
-aws lambda wait function-updated-v2 --function-name safeanes-inference-staging --region ap-southeast-1
-```
+    aws lambda update-function-code --function-name safeanes-inference --image-uri "127091441306.dkr.ecr.ap-southeast-1.amazonaws.com/safeanes-inference@sha256:<previous-digest>" --region ap-southeast-1
+    aws lambda wait function-updated-v2 --function-name safeanes-inference --region ap-southeast-1
 
-Re-run health and readiness after rollback, then record the failed build ID, candidate digest, last known-good deployment/digest, failed checks, and rollback verification. Keep token values and other credentials out of that record.
+- Supabase: không xóa dữ liệu hoặc cột additive. Nếu policy cần đảo, tạo migration tiến tới đã review; không khôi phục quyền ghi anon/authenticated rộng. Giữ nguyên bảng/policies clinical_*.
+
+Sau rollback, chạy lại health/readiness và smoke phù hợp. Báo cáo production phải chứa SHA, deployment IDs/build IDs, migration ID, digest, kết quả kiểm thử và rollback point; tuyệt đối không đưa credential hoặc PHI vào báo cáo.

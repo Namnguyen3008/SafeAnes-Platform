@@ -53,4 +53,4 @@ Luồng hiện tại có thể gọi Lambda chỉ với mã ca và thời điể
 
 ## Triển khai
 
-Đưa contract và kiểm thử vào code trước; cấu hình token ở Render/Lambda sau khi có giá trị secret riêng. Rollout chỉ tiếp tục khi health/readiness, test contract và phép thử inference thực trên staging đạt. Không áp dụng thay đổi Lambda hoặc deploy production trong giai đoạn viết spec/plan.
+Đưa contract và kiểm thử vào code trước; khi triển khai, cấu hình cùng `SAFEANES_INFERENCE_SERVICE_TOKEN` ở Render/Lambda bằng secret store. Theo quyết định rollout ngày 2026-10-17, không dùng staging; triển khai production sau khi CI, health/readiness và cấu hình token parity được xác nhận. Phép thử live UC04/UC05 qua FastAPI cùng provenance là gate bắt buộc sau deploy; nếu chưa thể truy cập đúng Render service thì không cập nhật Lambda.

@@ -47,8 +47,8 @@ Các cấu hình hiện tại lệch nhau ở những giá trị ảnh hưởng 
 - Một kiểm tra parity xác nhận Blueprint, default và tài liệu thống nhất cho các config có giá trị mặc định/production.
 - Build frontend và backend Docker thành công trong runner tương thích; test suite backend đạt.
 - Checklist deploy nêu rõ trigger, artifact/version, health checks, smoke tests, dấu hiệu thành công và rollback cho Vercel, Render, Lambda.
-- Các endpoint liveness/readiness và smoke test staging phân biệt lỗi app, model, token và upstream.
+- Các endpoint liveness/readiness và production smoke test phân biệt lỗi app, model, token và upstream.
 
 ## Ràng buộc rollout
 
-Đầu tiên xác minh cấu hình thực tế của Render/Vercel/Lambda bằng thông tin đọc được. Thay đổi config trong repo phải qua staging trước; production secrets chỉ được cập nhật theo quy trình deploy có kiểm soát. Không tuyên bố deploy hoàn tất chỉ dựa trên build thành công.
+Trước khi rollout, xác minh cấu hình thực tế của Render/Vercel/Lambda bằng thông tin đọc được, ghi rollback point và chạy CI trên đúng SHA. Theo quyết định ngày 2026-10-17, rollout nhắm production trực tiếp, không tạo staging; platform secret chỉ được cập nhật trong secret store và phải khớp giữa Render/Lambda. Dừng trước Lambda publish nếu production workspace hoặc token parity chưa xác minh. Không tuyên bố deploy hoàn tất chỉ dựa trên build thành công.

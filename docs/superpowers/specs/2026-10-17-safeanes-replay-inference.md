@@ -47,8 +47,8 @@ Backend có `ReplayInferenceScheduler`, nhưng route SSE hiện không kết n�
 - Test hàng đợi vượt tải chứng minh giới hạn bộ nhớ/concurrency và hành vi coalesce được giữ.
 - Test seek, đổi ca, stop/start, reconnect chứng minh generation cũ bị loại ở backend lẫn frontend.
 - Test kiểm tra contract payload và UI giữ nhãn `LIVE_INFERENCE`/`OFFLINE_CACHE` đúng; live lỗi không rơi về điểm cache.
-- Kiểm thử luồng từ playback `PLAYING` tới SSE `inference_result` được chạy bằng mock/model fixture ổn định, rồi smoke test staging dùng model thật.
+- Kiểm thử luồng từ playback `PLAYING` tới SSE `inference_result` được chạy bằng mock/model fixture ổn định, rồi production smoke dùng model thật sau health/readiness gate.
 
 ## Rollout
 
-Trước tiên triển khai worker/scheduler có metric và feature flag nếu dự án đã có cơ chế flag phù hợp. Bật cho staging, kiểm tra tốc độ SSE, queue depth, stale-discard count và độ trễ inference. Chỉ bật production sau khi luồng inference thật đã qua tiêu chí của spec inference.
+Triển khai worker/scheduler có metric và feature flag nếu dự án đã có cơ chế phù hợp. Không tạo staging target theo quyết định rollout ngày 2026-10-17; kiểm tra tốc độ SSE, queue depth, stale-discard count và độ trễ inference trên production bằng case kiểm thử được phép, sau khi inference contract thật đã qua health/readiness và positive smoke qua FastAPI. Dừng rollout nếu replay làm nghẽn SSE hoặc phát kết quả generation cũ.
