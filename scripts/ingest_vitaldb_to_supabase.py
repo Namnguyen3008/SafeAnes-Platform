@@ -9,6 +9,7 @@ and upserts them directly into Supabase PostgreSQL.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import math
@@ -76,19 +77,64 @@ def _postgrest_upsert(
 def ensure_vital_downloaded(case_id: str, raw_dir: Path) -> Path:
     raw_dir.mkdir(parents=True, exist_ok=True)
     target = raw_dir / f"{case_id}.vital"
-    if target.is_file() and target.stat().st_size > 1024:
-        logger.info(f"Using locally cached VitalDB file: {target} ({target.stat().st_size / 1024 / 1024:.1f} MB)")
-        return target
+    manifest = load_manifest(case_id, PROJECT_ROOT)
+    raw_file = manifest.get("raw_file", {})
+    expected_size = raw_file.get("size_bytes") if isinstance(raw_file, dict) else None
+    expected_sha256 = raw_file.get("sha256") if isinstance(raw_file, dict) else None
 
-    url = f"{VITALDB_API}/{case_id}.vital"
+    def matches_manifest(path: Path) -> bool:
+        if not path.is_file():
+            return False
+        if expected_size is not None and path.stat().st_size != expected_size:
+            return False
+        if expected_sha256:
+            digest = hashlib.sha256()
+            with path.open("rb") as cached_file:
+                for chunk in iter(lambda: cached_file.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            if digest.hexdigest().lower() != str(expected_sha256).lower():
+                return False
+        return True
+
+    if target.is_file():
+        cache_is_valid = (
+            matches_manifest(target)
+            if expected_size is not None or expected_sha256
+            else target.stat().st_size > 1024
+        )
+        if cache_is_valid:
+            logger.info(f"Using locally cached VitalDB file: {target} ({target.stat().st_size / 1024 / 1024:.1f} MB)")
+            return target
+
+    version = manifest.get("source_dataset_version") or "1.0.1"
+    url = manifest.get("source_uri") or f"{VITALDB_API}/{version}/{case_id}.vital"
     logger.info(f"Downloading VitalDB case {case_id} from {url}...")
     temp_target = raw_dir / f"{case_id}.vital.downloading"
-    with httpx.stream("GET", url, timeout=120.0, follow_redirects=True) as response:
-        response.raise_for_status()
-        with open(temp_target, "wb") as f:
-            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
-                f.write(chunk)
-    temp_target.replace(target)
+    digest = hashlib.sha256()
+    downloaded_size = 0
+    try:
+        with httpx.stream("GET", url, timeout=120.0, follow_redirects=True) as response:
+            response.raise_for_status()
+            with temp_target.open("wb") as downloaded_file:
+                for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                    downloaded_file.write(chunk)
+                    digest.update(chunk)
+                    downloaded_size += len(chunk)
+
+        if expected_size is not None and downloaded_size != expected_size:
+            raise ValueError(
+                f"Downloaded VitalDB case {case_id} size does not match manifest: "
+                f"expected {expected_size}, got {downloaded_size}"
+            )
+        actual_sha256 = digest.hexdigest()
+        if expected_sha256 and actual_sha256.lower() != str(expected_sha256).lower():
+            raise ValueError(
+                f"Downloaded VitalDB case {case_id} SHA-256 does not match manifest: "
+                f"expected {expected_sha256}, got {actual_sha256}"
+            )
+        temp_target.replace(target)
+    finally:
+        temp_target.unlink(missing_ok=True)
     logger.info(f"Downloaded VitalDB case {case_id}: {target.stat().st_size / 1024 / 1024:.1f} MB")
     return target
 

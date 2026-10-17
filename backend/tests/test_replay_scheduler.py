@@ -57,6 +57,29 @@ def test_live_inference_result_is_marked_as_live() -> None:
     assert payload["source"] == "LIVE_INFERENCE"
 
 
+def test_remote_worker_preserves_preprocessing_quality_metadata() -> None:
+    predictions = [{
+        "data_coverage": 0.62,
+        "missing_features": ["MAP", "SpO2"],
+    }]
+    model_manager = SimpleNamespace(
+        settings=SimpleNamespace(offload_inference=True, inference_url="https://lambda.example"),
+        vitaldb=None,
+        preprocessor=None,
+        predict=lambda case_id, model_id, prediction_time_s: predictions,
+    )
+    worker = LiveInferenceWorker(model_manager, window_loader=object())
+
+    try:
+        result = worker.execute_sync("session-1", 4, "case-1", "uc04", 123.0)
+    finally:
+        worker.close()
+
+    assert result is not None
+    assert result.coverage == 0.62
+    assert result.missing_features == ["MAP", "SpO2"]
+
+
 def test_scheduler_does_not_submit_when_not_playing() -> None:
     class Worker:
         calls = 0

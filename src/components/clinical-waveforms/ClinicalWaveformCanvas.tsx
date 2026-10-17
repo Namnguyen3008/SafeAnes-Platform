@@ -89,6 +89,7 @@ export function ClinicalWaveformCanvas({
   const workerRef = useRef<Worker | null>(null);
   const isWorkerActiveRef = useRef<boolean>(false);
   const hasTransferredRef = useRef<boolean>(false);
+  const workerCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // In-thread fallback state (Phase 1)
   const streamRef = useRef<StreamEntry | null>(null);
@@ -158,6 +159,11 @@ export function ClinicalWaveformCanvas({
 
   // Phase 2: Initialize Web Worker and OffscreenCanvas on mount
   useEffect(() => {
+    if (workerCleanupTimeoutRef.current !== null) {
+      clearTimeout(workerCleanupTimeoutRef.current);
+      workerCleanupTimeoutRef.current = null;
+    }
+
     const host = hostRef.current;
     const canvas = canvasRef.current;
     if (!host || !canvas) return;
@@ -223,16 +229,23 @@ export function ClinicalWaveformCanvas({
     }
 
     return () => {
-      if (workerRef.current) {
+      const worker = workerRef.current;
+      if (!worker) return;
+
+      // React StrictMode replays effects immediately after cleanup in development.
+      // Delay disposal one task so that replay can reuse the transferred canvas and worker.
+      workerCleanupTimeoutRef.current = setTimeout(() => {
+        workerCleanupTimeoutRef.current = null;
+        if (workerRef.current !== worker) return;
         try {
-          workerRef.current.postMessage({ type: "DISPOSE" });
-          workerRef.current.terminate();
+          worker.postMessage({ type: "DISPOSE" });
+          worker.terminate();
         } catch {
           // ignore cleanup errors during unmount
         }
         workerRef.current = null;
         isWorkerActiveRef.current = false;
-      }
+      }, 0);
     };
   }, []);
 

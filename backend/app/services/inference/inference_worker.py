@@ -4,6 +4,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import logging
+import math
 import threading
 import time
 from typing import Any
@@ -98,6 +99,20 @@ class LiveInferenceWorker:
         try:
             if getattr(self.model_manager.settings, "offload_inference", False) and getattr(self.model_manager.settings, "inference_url", None):
                 predictions = self.model_manager.predict(case_id, model_id, prediction_time_s)
+                if not predictions or not isinstance(predictions[0], dict):
+                    raise ValueError("remote inference did not return prediction metadata")
+                prediction_metadata = predictions[0]
+                coverage = prediction_metadata.get("data_coverage")
+                missing_features = prediction_metadata.get("missing_features")
+                if (
+                    isinstance(coverage, bool)
+                    or not isinstance(coverage, (int, float))
+                    or not math.isfinite(float(coverage))
+                    or not 0.0 <= float(coverage) <= 1.0
+                    or not isinstance(missing_features, list)
+                    or any(not isinstance(feature, str) for feature in missing_features)
+                ):
+                    raise ValueError("remote inference returned invalid quality metadata")
                 latency_ms = round((time.perf_counter() - t0) * 1000, 2)
                 return LiveInferenceResult(
                     session_id=session_id,
@@ -106,8 +121,8 @@ class LiveInferenceWorker:
                     model_id=model_id,
                     prediction_time=prediction_time_s,
                     predictions=predictions,
-                    coverage=1.0,
-                    missing_features=[],
+                    coverage=float(coverage),
+                    missing_features=list(missing_features),
                     latency_ms=latency_ms,
                 )
 

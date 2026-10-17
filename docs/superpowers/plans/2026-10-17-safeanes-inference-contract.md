@@ -189,26 +189,26 @@
 - Đầu vào: Tasks 1–4.
 - Đầu ra: Bộ kiểm thử lặp lại được, chứng minh luồng client → FastAPI → Lambda → FastAPI cùng source/provenance mà không phụ thuộc production.
 
-- [ ] **Step 1: Chạy contract suite tập trung**
+- [x] **Step 1: Chạy contract suite tập trung**
 
   Chạy: python -m pytest backend/tests/test_lambda_inference_contract.py backend/tests/test_remote_inference_contract.py backend/tests/test_model_manager_remote.py backend/tests/test_api_backend.py -q
   Kết quả mong đợi: PASS; không còn fallback điểm cố định và không có remote call thiếu xác thực.
 
-  Kết quả xác minh: lệnh nguyên bản 76 passed và 1 lỗi integrity hash config UC05; khi loại riêng test này, 76 passed, 1 deselected.
+  Kết quả xác minh cập nhật: nguyên nhân integrity là checkout Windows chuyển model JSON sang CRLF, làm SHA-256 không khớp registry. Thêm `.gitattributes` giữ LF cho các JSON model và khôi phục byte gốc; hash cả năm artifact hiện khớp manifest. Aggregate contract/regression suite: 125 passed, 1 deselected; toàn bộ backend sau khi bổ sung kiểm tra VitalDB cache/manifest: 218 passed, 12 skipped, 13 warnings.
 
-- [ ] **Step 2: Chạy bộ kiểm thử backend hồi quy ổn định**
+- [x] **Step 2: Chạy bộ kiểm thử backend hồi quy ổn định**
 
   Chạy: python -m pytest backend/tests/test_runtime_configuration.py backend/tests/test_api_backend.py backend/tests/test_uc04_inference.py backend/tests/test_uc05_inference.py -q
   Kết quả mong đợi: PASS cho nhóm kiểm thử cấu hình, API và model contract có tính xác định. Không thêm test_live_inference_replay.py vào lệnh này vì file đó có kiểm tra model/Supabase phụ thuộc môi trường.
 
-  Kết quả xác minh: lệnh nguyên bản 81 passed, 3 failed, 7 lỗi setup do hash artifact UC04/UC05; sau khi loại 10 test phụ thuộc artifact, 81 passed, 10 deselected. Toàn bộ backend: 203 passed, 12 skipped, 4 failed, 7 lỗi setup; bản lọc lỗi artifact/model-readiness: 203 passed, 12 skipped, 11 deselected.
+  Kết quả xác minh cập nhật: sau khi cố định line ending cho model JSON và khôi phục artifact đúng byte, `python -m pytest backend/tests -q` đạt 218 passed, 12 skipped, 13 warnings; không còn lỗi integrity/model readiness trong suite này.
 
 - [x] **Step 3: Build frontend**
 
   Chạy: npm run build
   Kết quả mong đợi: PASS với source union và API proxy đã cập nhật.
 
-  Kết quả xác minh: npm run build thành công.
+  Kết quả xác minh cập nhật: `npm run build` pass sau phần sửa StrictMode; Next.js compile, kiểm tra type/lint, static generation và postbuild đều thành công.
 
 - [ ] **Step 4: Smoke test inference trên staging**
 

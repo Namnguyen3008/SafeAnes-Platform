@@ -1,11 +1,116 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from scripts import ingest_vitaldb_to_supabase as ingest
+
+
+def test_download_reuses_cache_only_when_manifest_hash_matches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    payload = b"verified-vitaldb-cache" * 256
+    manifest = {
+        "source_uri": "https://api.vitaldb.net/1.0.1/1.vital",
+        "raw_file": {"size_bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()},
+    }
+    monkeypatch.setattr(ingest, "load_manifest", lambda _case_id, _root: manifest)
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    target = raw_dir / "1.vital"
+    target.write_bytes(payload)
+
+    def unexpected_download(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("verified cache should not be downloaded again")
+
+    monkeypatch.setattr(ingest.httpx, "stream", unexpected_download)
+
+    assert ingest.ensure_vital_downloaded("1", raw_dir) == target
+    assert target.read_bytes() == payload
+
+
+def test_download_uses_manifest_and_replaces_unverified_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    payload = b"audited-vitaldb-payload" * 256
+    manifest = {
+        "source_uri": "https://api.vitaldb.net/1.0.1/1.vital",
+        "raw_file": {"size_bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()},
+    }
+    monkeypatch.setattr(ingest, "load_manifest", lambda _case_id, _root: manifest)
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    target = raw_dir / "1.vital"
+    target.write_bytes(b"stale-unversioned-cache" * 256)
+    requests: list[tuple[str, str]] = []
+
+    class StreamResponse:
+        def __enter__(self) -> StreamResponse:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_bytes(self, *, chunk_size: int):
+            assert chunk_size == 1024 * 1024
+            yield payload
+
+    def fake_stream(method: str, url: str, **_kwargs: object) -> StreamResponse:
+        requests.append((method, url))
+        return StreamResponse()
+
+    monkeypatch.setattr(ingest.httpx, "stream", fake_stream)
+
+    result = ingest.ensure_vital_downloaded("1", raw_dir)
+
+    assert result == target
+    assert requests == [("GET", manifest["source_uri"])]
+    assert target.read_bytes() == payload
+    assert not (raw_dir / "1.vital.downloading").exists()
+
+
+def test_download_checksum_failure_keeps_existing_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    expected = b"y" * 2048
+    downloaded = b"x" * 2048
+    manifest = {
+        "source_uri": "https://api.vitaldb.net/1.0.1/1.vital",
+        "raw_file": {"size_bytes": len(expected), "sha256": hashlib.sha256(expected).hexdigest()},
+    }
+    monkeypatch.setattr(ingest, "load_manifest", lambda _case_id, _root: manifest)
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    target = raw_dir / "1.vital"
+    original = b"previous-cache" * 128
+    target.write_bytes(original)
+
+    class StreamResponse:
+        def __enter__(self) -> StreamResponse:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_bytes(self, *, chunk_size: int):
+            yield downloaded
+
+    monkeypatch.setattr(ingest.httpx, "stream", lambda *_args, **_kwargs: StreamResponse())
+
+    with pytest.raises(ValueError, match="manifest"):
+        ingest.ensure_vital_downloaded("1", raw_dir)
+
+    assert target.read_bytes() == original
+    assert not (raw_dir / "1.vital.downloading").exists()
 
 
 def test_dry_run_needs_no_write_credential(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -269,7 +269,11 @@ test.describe("test-owned VitalDB replay parity", () => {
     await page.route("**/api/backend/v1/**", route => route.abort("failed"));
     await controls(page);
     await setScrubber(page, 1000);
-    await expect(page.locator("#safeanes-simulation-control [role='status']")).toContainText(/BACKEND_UNAVAILABLE|Failed|fetch/i);
+    const failureStatus = page
+      .locator("#safeanes-simulation-control [role='status']")
+      .filter({ hasText: /BACKEND_UNAVAILABLE|Failed|fetch/i })
+      .first();
+    await expect(failureStatus).toContainText(/BACKEND_UNAVAILABLE|Failed|fetch/i);
     await expect(page.locator("#safeanes-replay-source")).toHaveValue("VITALDB_REPLAY");
     await expect(page.locator("header .safe-header-clock")).toContainText(clock(TIME));
     await expect(page.locator("header")).not.toContainText("SYNTHETIC DEMO");
