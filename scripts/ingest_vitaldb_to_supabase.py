@@ -32,23 +32,45 @@ logging.basicConfig(
 )
 logger = logging.getLogger("safeanes.ingest_vitaldb")
 
-SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "https://nntxlqchytvfmutmixea.supabase.co")
-SUPABASE_KEY = os.getenv(
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5udHhscWNoeXR2Zm11dG1peGVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5Nzk3OTcsImV4cCI6MjEwMTU1NTc5N30.robUviwFKiyoXaYEKRjM2JyhTCWO6vC5BlRkA_vD3D4",
-)
 VITALDB_API = "https://api.vitaldb.net"
 DEFAULT_CASES = ["1", "6388", "3300", "210", "452", "3091", "3515"]
 
 
-def get_http_client() -> httpx.Client:
+def _get_supabase_url() -> str:
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    if not supabase_url:
+        raise RuntimeError("SUPABASE_URL is required for live VitalDB ingestion")
+    return supabase_url.rstrip("/")
+
+
+def get_http_client(*, dry_run: bool = False) -> httpx.Client | None:
+    if dry_run:
+        return None
+
+    supabase_url = _get_supabase_url()
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not service_role_key:
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for live VitalDB ingestion")
+
     headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "apikey": service_role_key,
+        "Authorization": f"Bearer {service_role_key}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates",
     }
-    return httpx.Client(headers=headers, timeout=60.0)
+    return httpx.Client(base_url=supabase_url, headers=headers, timeout=60.0)
+
+
+def _postgrest_upsert(
+    client: httpx.Client | None, table_name: str, records: list[dict[str, Any]]
+) -> httpx.Response:
+    if client is None:
+        raise RuntimeError("Supabase client is unavailable for a live VitalDB upsert")
+    return client.post(
+        f"{_get_supabase_url()}/rest/v1/{table_name}",
+        json=records,
+        params={"on_conflict": "id"},
+    )
 
 
 def ensure_vital_downloaded(case_id: str, raw_dir: Path) -> Path:
@@ -81,7 +103,7 @@ def load_manifest(case_id: str, project_root: Path) -> dict[str, Any]:
     return {}
 
 
-def upsert_case(client: httpx.Client, case_id: str, vf: Any, manifest: dict[str, Any], dry_run: bool = False):
+def upsert_case(client: httpx.Client | None, case_id: str, vf: Any, manifest: dict[str, Any], dry_run: bool = False):
     p_context = manifest.get("patient_context", {})
     duration_s = float(vf.dtend - vf.dtstart)
     signals = list(vf.trks.keys())
@@ -154,15 +176,14 @@ def upsert_case(client: httpx.Client, case_id: str, vf: Any, manifest: dict[str,
         logger.info(f"[DRY-RUN] Would upsert cases: {[r['id'] for r in records]}")
         return
 
-    url = f"{SUPABASE_URL}/rest/v1/safeanes_cases"
-    resp = client.post(url, json=records)
+    resp = _postgrest_upsert(client, "safeanes_cases", records)
     if resp.status_code not in (200, 201):
-        logger.error(f"Failed to upsert safeanes_cases: {resp.status_code} {resp.text}")
+        logger.error("Failed to upsert safeanes_cases: HTTP %s", resp.status_code)
     else:
         logger.info(f"Upserted case {case_id} & case_vitaldb_{case_id} into safeanes_cases")
 
 
-def upsert_tracks(client: httpx.Client, case_id: str, vf: Any, dry_run: bool = False):
+def upsert_tracks(client: httpx.Client | None, case_id: str, vf: Any, dry_run: bool = False):
     records = []
     duration_s = float(vf.dtend - vf.dtstart)
 
@@ -191,17 +212,16 @@ def upsert_tracks(client: httpx.Client, case_id: str, vf: Any, dry_run: bool = F
         logger.info(f"[DRY-RUN] Would upsert {len(records)} tracks for case {case_id}")
         return
 
-    url = f"{SUPABASE_URL}/rest/v1/safeanes_tracks"
     batch_size = 50
     for i in range(0, len(records), batch_size):
         chunk = records[i : i + batch_size]
-        resp = client.post(url, json=chunk)
+        resp = _postgrest_upsert(client, "safeanes_tracks", chunk)
         if resp.status_code not in (200, 201):
-            logger.error(f"Failed to upsert tracks batch {i}: {resp.status_code} {resp.text}")
+            logger.error("Failed to upsert tracks batch %s: HTTP %s", i, resp.status_code)
     logger.info(f"Upserted {len(records)} tracks for case {case_id}")
 
 
-def upsert_events(client: httpx.Client, case_id: str, vf: Any, dry_run: bool = False):
+def upsert_events(client: httpx.Client | None, case_id: str, vf: Any, dry_run: bool = False):
     event_trk = vf.trks.get("EVENT")
     if not event_trk or not hasattr(event_trk, "recs") or not event_trk.recs:
         logger.info(f"No EVENT track for case {case_id}")
@@ -230,15 +250,14 @@ def upsert_events(client: httpx.Client, case_id: str, vf: Any, dry_run: bool = F
         logger.info(f"[DRY-RUN] Would upsert {len(records)} events for case {case_id}")
         return
 
-    url = f"{SUPABASE_URL}/rest/v1/safeanes_events"
-    resp = client.post(url, json=records)
+    resp = _postgrest_upsert(client, "safeanes_events", records)
     if resp.status_code not in (200, 201):
-        logger.error(f"Failed to upsert events: {resp.status_code} {resp.text}")
+        logger.error("Failed to upsert events: HTTP %s", resp.status_code)
     else:
         logger.info(f"Upserted {len(records)} events for case {case_id}")
 
 
-def upsert_signal_windows(client: httpx.Client, case_id: str, vf: Any, dry_run: bool = False):
+def upsert_signal_windows(client: httpx.Client | None, case_id: str, vf: Any, dry_run: bool = False):
     """
     Extracts key hemodynamic and respiratory signals at 1-second intervals
     and generates 30-minute window chunks in safeanes_signal_windows.
@@ -311,11 +330,10 @@ def upsert_signal_windows(client: httpx.Client, case_id: str, vf: Any, dry_run: 
         logger.info(f"[DRY-RUN] Would upsert {len(window_records)} signal windows for case {case_id}")
         return
 
-    url = f"{SUPABASE_URL}/rest/v1/safeanes_signal_windows"
     for r in window_records:
-        resp = client.post(url, json=[r])
+        resp = _postgrest_upsert(client, "safeanes_signal_windows", [r])
         if resp.status_code not in (200, 201):
-            logger.error(f"Failed to upsert signal window {r['id']}: {resp.status_code} {resp.text}")
+            logger.error("Failed to upsert signal window %s: HTTP %s", r["id"], resp.status_code)
     logger.info(f"Upserted {len(window_records)} signal windows for case {case_id}")
 
 
@@ -330,7 +348,7 @@ def main():
 
     case_ids = [c.strip() for c in args.cases.split(",") if c.strip()]
     raw_dir = Path(args.raw_dir)
-    client = get_http_client()
+    client = get_http_client(dry_run=args.dry_run)
 
     logger.info(f"Starting VitalDB ingestion for {len(case_ids)} cases: {case_ids}")
     start_time = time.time()
