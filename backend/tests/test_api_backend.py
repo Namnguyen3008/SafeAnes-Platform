@@ -873,7 +873,10 @@ def test_replay_stream_scheduler_exception_has_complete_safe_error_contract(tmp_
         client.post(f"/api/v1/replay/sessions/{session_id}/play")
         runtime = client.app.state.runtime
 
+        scheduler_snapshot = {}
+
         async def failing_scheduler(session):
+            scheduler_snapshot.update(session)
             raise RuntimeError("private inference implementation detail")
 
         runtime.replay_scheduler.schedule_if_due = failing_scheduler
@@ -907,7 +910,7 @@ def test_replay_stream_scheduler_exception_has_complete_safe_error_contract(tmp_
     assert payload["case_id"] == "1"
     assert isinstance(payload["generation"], int)
     assert payload["model_id"] == "UNKNOWN"
-    assert payload["prediction_time"] == 0.0
+    assert payload["prediction_time"] == pytest.approx(scheduler_snapshot["current_time_seconds"])
     assert payload["code"] == "LIVE_INFERENCE_FAILED"
     assert "private inference implementation detail" not in json.dumps(payload)
 
