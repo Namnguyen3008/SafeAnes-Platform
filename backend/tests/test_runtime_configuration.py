@@ -30,6 +30,30 @@ def test_settings_load_external_model_files_and_application_mode(monkeypatch: py
     assert settings.application_mode == "VITALDB_REPLAY"
 
 
+def test_settings_load_inference_service_token_without_exposing_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    token = "private-lambda-service-token"
+    monkeypatch.setenv("SAFEANES_INFERENCE_SERVICE_TOKEN", token)
+
+    settings = Settings.from_env()
+
+    assert settings.inference_service_token == token
+    assert token not in repr(settings)
+
+
+def test_remote_inference_requires_service_token_when_offload_is_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SAFEANES_INFERENCE_SERVICE_TOKEN", raising=False)
+
+    with pytest.raises(ValueError, match="SAFEANES_INFERENCE_SERVICE_TOKEN"):
+        Settings(
+            data_root=Path("data"),
+            model_root=Path("models"),
+            inference_url="https://lambda.example",
+            offload_inference=True,
+        )
+
+
 def test_production_settings_require_an_access_token() -> None:
     with pytest.raises(ValueError, match="SAFEANES_API_TOKEN"):
         Settings(data_root=Path("data"), model_root=Path("models"), environment="production")

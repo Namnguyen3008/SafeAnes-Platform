@@ -75,6 +75,7 @@ class Settings:
     prediction_cache_entries: int = 2
     inference_url: str | None = None
     offload_inference: bool = False
+    inference_service_token: str | None = field(default=None, repr=False)
     build_id: str = field(default_factory=get_backend_build_id)
 
     def __post_init__(self) -> None:
@@ -100,8 +101,15 @@ class Settings:
         object.__setattr__(self, "log_level", self.log_level.upper())
         if self.api_token and (not self.api_token.isascii() or any(char.isspace() for char in self.api_token)):
             raise ValueError("SAFEANES_API_TOKEN must contain ASCII non-whitespace characters only")
+        if self.inference_service_token and (
+            not self.inference_service_token.isascii()
+            or any(char.isspace() for char in self.inference_service_token)
+        ):
+            raise ValueError("SAFEANES_INFERENCE_SERVICE_TOKEN must contain ASCII non-whitespace characters only")
         if self.environment == "production" and (not self.api_token or len(self.api_token) < 16):
             raise ValueError("SAFEANES_API_TOKEN must be set to at least 16 characters in production")
+        if self.offload_inference and self.inference_url and not self.inference_service_token:
+            raise ValueError("SAFEANES_INFERENCE_SERVICE_TOKEN is required when remote inference offload is enabled")
         _parse_hosts(",".join(self.allowed_hosts))
         if (
             not math.isfinite(self.max_signal_range_seconds)
@@ -159,4 +167,5 @@ class Settings:
             prediction_cache_entries=int(os.getenv("SAFEANES_PREDICTION_CACHE_ENTRIES", "2")),
             inference_url=(os.getenv("SAFEANES_INFERENCE_URL") or os.getenv("SAFEANES_LAMBDA_INFERENCE_URL") or None),
             offload_inference=os.getenv("SAFEANES_OFFLOAD_INFERENCE", "false").strip().lower() in ("true", "1", "yes"),
+            inference_service_token=os.getenv("SAFEANES_INFERENCE_SERVICE_TOKEN") or None,
         )
