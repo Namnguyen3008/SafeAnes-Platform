@@ -98,7 +98,7 @@ class UC05VitalDBViewService:
         derived_events: list[dict[str, Any]] = []
         spo2_track = tracks.get(_NUMERIC_TRACKS["SPO2"])
         if spo2_track and as_of > start:
-            lookback_start = max(0.0, start - 60.0)
+            lookback_start = max(0.0, max(start - 60.0, as_of - self.settings.max_signal_range_seconds))
             spo2 = self.signals.signals(normalized, _NUMERIC_TRACKS["SPO2"], lookback_start, as_of)
             cadence = spo2_track.get("observed_update_rate_hz")
             try:

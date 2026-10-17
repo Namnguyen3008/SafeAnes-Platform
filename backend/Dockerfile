@@ -15,8 +15,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UC04_MODEL_PATH=/models/safeanes_uc04_model/model.pt \
     UC05_MODEL_PATH=/models/safeanes_uc05_respformer_v1/respformer.pt \
     SAFEANES_RUNTIME_DEVICE=cpu \
-    SAFEANES_SIGNAL_FILE_CACHE_ENTRIES=6 \
-    SAFEANES_MAX_SIGNAL_RANGE_SECONDS=600 \
     PYTHONPATH=/app
 
 WORKDIR /app
