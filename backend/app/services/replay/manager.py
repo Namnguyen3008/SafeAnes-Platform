@@ -81,6 +81,8 @@ class ReplayManager:
                 self._touch(session)
             if session.current_time_s >= session.duration_seconds:
                 session.current_time_s = 0.0
+                if session.status == "COMPLETED":
+                    session.generation += 1
             session.status = "PLAYING"
             if session.started_at is None:
                 session.started_at = self._now()
@@ -95,6 +97,8 @@ class ReplayManager:
                 self._touch(session)
             if session.current_time_s >= session.duration_seconds:
                 session.current_time_s = 0.0
+                if session.status == "COMPLETED":
+                    session.generation += 1
             session.status = "PLAYING"
             if session.started_at is None:
                 session.started_at = self._now()

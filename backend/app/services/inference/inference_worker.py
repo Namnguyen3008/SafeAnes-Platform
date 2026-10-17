@@ -4,6 +4,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import logging
+import threading
 import time
 from typing import Any
 
@@ -11,6 +12,7 @@ from backend.app.services.inference.model_manager import ModelManager
 from backend.app.services.replay.window_loader import WindowLoader
 
 logger = logging.getLogger("safeanes.inference_worker")
+MAX_PENDING_JOBS = 8
 
 
 @dataclass(frozen=True)
@@ -34,10 +36,39 @@ class LiveInferenceResult:
             "model_id": self.model_id,
             "prediction_time": self.prediction_time,
             "predictions": self.predictions,
+            "source": "LIVE_INFERENCE",
             "coverage": self.coverage,
             "missing_features": self.missing_features,
             "latency_ms": self.latency_ms,
         }
+
+
+@dataclass(frozen=True)
+class LiveInferenceFailure:
+    session_id: str
+    generation: int
+    case_id: str
+    model_id: str
+    prediction_time: float
+    code: str = "LIVE_INFERENCE_FAILED"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "event": "inference_error",
+            "session_id": self.session_id,
+            "generation": self.generation,
+            "case_id": self.case_id,
+            "model_id": self.model_id,
+            "prediction_time": self.prediction_time,
+            "code": self.code,
+        }
+
+
+class InferenceCapacityError(RuntimeError):
+    """Raised when the bounded live-inference queue is full."""
+
+    def __init__(self) -> None:
+        super().__init__("live inference worker is at capacity")
 
 
 class LiveInferenceWorker:
@@ -51,6 +82,8 @@ class LiveInferenceWorker:
         self.model_manager = model_manager
         self.window_loader = window_loader or WindowLoader(model_manager.vitaldb, model_manager.preprocessor)
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="LiveInferenceWorker")
+        self._pending_lock = threading.Lock()
+        self._pending_jobs = 0
 
     def execute_sync(
         self,
@@ -59,7 +92,7 @@ class LiveInferenceWorker:
         case_id: str,
         model_id: str,
         prediction_time_s: float,
-    ) -> LiveInferenceResult | None:
+    ) -> LiveInferenceResult | LiveInferenceFailure | None:
         """Run synchronized inference within a thread worker."""
         t0 = time.perf_counter()
         try:
@@ -106,11 +139,15 @@ class LiveInferenceWorker:
                 missing_features=missing,
                 latency_ms=latency_ms,
             )
-        except Exception as exc:
-            logger.warning(
-                f"Live inference failed for {model_id} at {prediction_time_s}s in case {case_id}: {exc}"
+        except Exception:
+            logger.warning("Live inference failed for model=%s code=LIVE_INFERENCE_FAILED", model_id)
+            return LiveInferenceFailure(
+                session_id=session_id,
+                generation=generation,
+                case_id=case_id,
+                model_id=model_id,
+                prediction_time=prediction_time_s,
             )
-            return None
 
     async def execute_async(
         self,
@@ -119,18 +156,33 @@ class LiveInferenceWorker:
         case_id: str,
         model_id: str,
         prediction_time_s: float,
-    ) -> LiveInferenceResult | None:
+    ) -> LiveInferenceResult | LiveInferenceFailure | None:
         """Asynchronously dispatch model inference to the thread pool."""
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self.execute_sync,
-            session_id,
-            generation,
-            case_id,
-            model_id,
-            prediction_time_s,
-        )
+        with self._pending_lock:
+            if self._pending_jobs >= MAX_PENDING_JOBS:
+                raise InferenceCapacityError()
+            self._pending_jobs += 1
+
+        try:
+            future = self._executor.submit(
+                self.execute_sync,
+                session_id,
+                generation,
+                case_id,
+                model_id,
+                prediction_time_s,
+            )
+        except BaseException:
+            self._release_pending_slot()
+            raise
+
+        future.add_done_callback(lambda _: self._release_pending_slot())
+        return await asyncio.wrap_future(future, loop=loop)
+
+    def _release_pending_slot(self) -> None:
+        with self._pending_lock:
+            self._pending_jobs -= 1
 
     def close(self) -> None:
         self._executor.shutdown(wait=False)
