@@ -863,6 +863,55 @@ def test_replay_stream_emits_safe_inference_error_event(tmp_path):
     assert "Traceback" not in error_event
 
 
+def test_replay_stream_scheduler_exception_has_complete_safe_error_contract(tmp_path):
+    with _client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/replay/sessions",
+            json={"case_id": "1", "start_time_s": 0, "speed": 1},
+        )
+        session_id = created.json()["session_id"]
+        client.post(f"/api/v1/replay/sessions/{session_id}/play")
+        runtime = client.app.state.runtime
+
+        async def failing_scheduler(session):
+            raise RuntimeError("private inference implementation detail")
+
+        runtime.replay_scheduler.schedule_if_due = failing_scheduler
+
+        class _Request:
+            app = client.app
+            calls = 0
+
+            async def is_disconnected(self):
+                self.calls += 1
+                return self.calls > 10
+
+        response = asyncio.run(stream_session(session_id, _Request()))
+
+        async def collect_error_event():
+            iterator = response.body_iterator
+            try:
+                for _ in range(10):
+                    item = await asyncio.wait_for(anext(iterator), timeout=2)
+                    event = item.decode("utf-8") if isinstance(item, bytes) else item
+                    if event.startswith("event: inference_error"):
+                        return json.loads(event.split("data: ", 1)[1].strip())
+                return None
+            finally:
+                await iterator.aclose()
+
+        payload = asyncio.run(collect_error_event())
+
+    assert payload is not None
+    assert payload["session_id"] == session_id
+    assert payload["case_id"] == "1"
+    assert isinstance(payload["generation"], int)
+    assert payload["model_id"] == "UNKNOWN"
+    assert payload["prediction_time"] == 0.0
+    assert payload["code"] == "LIVE_INFERENCE_FAILED"
+    assert "private inference implementation detail" not in json.dumps(payload)
+
+
 def test_cached_replay_predictions_are_filtered_at_the_frame_time():
     from backend.app.services.replay.stream import ReplayStreamService
 

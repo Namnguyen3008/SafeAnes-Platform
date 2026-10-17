@@ -113,6 +113,11 @@ async def stream_session(session_id: str, request: Request) -> StreamingResponse
                             "session_id": scheduled_snapshot["session_id"],
                             "generation": scheduled_snapshot["generation"],
                             "case_id": scheduled_snapshot["case_id"],
+                            "model_id": "UNKNOWN",
+                            "prediction_time": float(scheduled_snapshot.get(
+                                "current_time_seconds",
+                                scheduled_snapshot.get("current_time_s", 0.0),
+                            )),
                             "code": "LIVE_INFERENCE_FAILED",
                         })
                     elif matches_current_session:
@@ -124,6 +129,11 @@ async def stream_session(session_id: str, request: Request) -> StreamingResponse
                                     "session_id": scheduled_snapshot["session_id"],
                                     "generation": scheduled_snapshot["generation"],
                                     "case_id": scheduled_snapshot["case_id"],
+                                    "model_id": "UNKNOWN",
+                                    "prediction_time": float(scheduled_snapshot.get(
+                                        "current_time_seconds",
+                                        scheduled_snapshot.get("current_time_s", 0.0),
+                                    )),
                                     "code": "LIVE_INFERENCE_FAILED",
                                 })
                                 break
