@@ -41,7 +41,7 @@
 
 **Interfaces:**
 - Đầu vào: Payload insert/upsert hiện có trong scripts/ingest_vitaldb_to_supabase.py và row/query contract trong src/lib/api/supabaseVitalDbClient.ts.
-- Đầu ra: Bốn bảng khớp field contract: cases (id,dataset_id,subject_id,age,sex,height,weight,bmi,asa,op_name,department,duration_s,track_count,has_waveforms,review_status,metadata); tracks (id,case_id,signal_code,signal_name,device,sample_rate_hz,unit,duration_s,metadata); events (id,case_id,timestamp_s,event_type,name,value,unit,source_system,provenance_ref); windows (id,case_id,window_start_s,window_end_s,observations,waveforms,predictions_uc04,predictions_uc05). Dùng TEXT cho id, numeric cho giây tương đối của case, JSONB cho metadata/observations/waveforms/predictions; giữ event value kiểu TEXT theo schema production và payload/client hiện hữu, foreign key theo case, constraint window_end_s >= window_start_s, upsert key id và index cho truy vấn case/time.
+- Đầu ra: Bốn bảng khớp field contract: cases (id,dataset_id,subject_id,age,sex,height,weight,bmi,asa,op_name,department,duration_s,track_count,has_waveforms,review_status,metadata); tracks (id,case_id,signal_code,signal_name,device,sample_rate_hz,unit,duration_s,metadata); events (id,case_id,timestamp_s,event_type,name,value,unit,source_system,provenance_ref); windows (id,case_id,window_start_s,window_end_s,observations,waveforms,predictions_uc04,predictions_uc05). Dùng TEXT cho id, numeric cho giây tương đối của case, JSONB cho metadata/observations/waveforms/predictions; giữ events.value kiểu TEXT theo schema remote và contract client/ingest, foreign key theo case, constraint window_end_s >= window_start_s, upsert key id và index cho truy vấn case/time.
 
 - [x] **Step 1: Đọc schema remote trước khi viết migration**
 
@@ -54,7 +54,7 @@
 - [x] **Step 3: Chỉ start/reset database local và xác nhận test mới thất bại**
 
   Chạy: supabase start, supabase db reset và supabase test db supabase/tests/database/safeanes_vitaldb.test.sql
-  Kết quả: Docker Desktop đã được khởi động, `supabase start` và reset local đến migration `20261011` thành công. `supabase test db ... --local` đỏ như mong đợi vì bốn bảng `safeanes_*` chưa tồn tại; không dùng `--linked` hoặc `--db-url`.
+  Kết quả: Docker Desktop từng được khởi động; local reset tới migration 20261011 thành công và pgTAP đỏ như mong đợi vì bốn bảng safeanes_* chưa tồn tại. Không dùng --linked hoặc --db-url.
 
 - [x] **Step 4: Tạo migration chỉ bổ sung**
 
@@ -63,7 +63,7 @@
 - [x] **Step 5: Reset và kiểm thử database local**
 
   Chạy: supabase db reset, supabase test db supabase/tests/database/safeanes_vitaldb.test.sql và supabase db lint --level error
-  Kết quả: `supabase db reset --local`, pgTAP RLS test (82/82) và `supabase db lint --local --level error` đều PASS; clinical policy assertions giữ nguyên. Chỉ chạy trên local database.
+  Kết quả: local reset, pgTAP RLS test (82/82) và local schema lint đều PASS; clinical policy assertions giữ nguyên.
 
 - [x] **Step 6: Commit local config, migration và pgTAP tests**
 
@@ -131,7 +131,7 @@
 - [x] **Step 4: Chạy parity và local database tests**
 
   Chạy: node --test tests/supabase-vitaldb-contract.test.cjs, python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và supabase test db supabase/tests/database/safeanes_vitaldb.test.sql
-  Kết quả: Node contract test (3/3), ingest pytest (9/9), pgTAP (82/82) và local schema lint đều PASS sau full local reset.
+  Kết quả: Node contract 3/3, ingest pytest 9/9, pgTAP 82/82 và local schema lint PASS sau full local reset.
 
 - [x] **Step 5: Commit contract tests và mọi sửa parity cần thiết**
 
@@ -165,7 +165,7 @@
 - [x] **Step 4: Chạy toàn bộ database và credential checks local**
 
   Chạy: supabase start, supabase db reset, supabase test db, supabase db lint --level error, python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và node --test tests/supabase-vitaldb-contract.test.cjs
-  Kết quả: `supabase start`, full local reset, pgTAP (82/82), schema lint, ingest pytest (9/9) và Node contract test (3/3) đều PASS; workflow chỉ dùng local commands.
+  Kết quả: local reset, pgTAP 82/82, schema lint, ingest pytest 9/9 và Node contract 3/3 PASS; workflow chỉ dùng local commands.
 
 - [x] **Step 5: Chuẩn bị staging decision record nhưng không chạy remote migration**
 
@@ -184,6 +184,6 @@
 
 ### Kết quả kiểm tra bổ sung cho ingestion
 
-Kiểm tra nguồn đã phát hiện helper có thể dùng lại file cache chỉ dựa trên kích thước và tải URL VitalDB không gắn phiên bản, dù manifest lưu URL cùng checksum cụ thể. Helper hiện ưu tiên `source_uri` trong manifest, dùng URL có phiên bản làm fallback, chỉ dùng lại cache nếu metadata integrity có trong manifest khớp, và chỉ thay cache sau khi tải tạm hoàn tất và vượt qua kiểm tra size/SHA-256. Nếu tải hoặc kiểm tra thất bại, cache cũ được giữ nguyên.
+Kiểm tra nguồn phát hiện helper có thể dùng lại cache chỉ dựa trên kích thước và tải URL VitalDB không gắn phiên bản dù manifest lưu URL cùng checksum. Helper hiện ưu tiên `source_uri` trong manifest, kiểm tra size/SHA-256 trước khi dùng lại cache và chỉ thay cache sau khi file tạm được xác minh; nếu tải hoặc kiểm tra thất bại, cache cũ được giữ nguyên.
 
-Đã thêm test cho cache hợp lệ, thay cache sai bằng nội dung đã xác minh, và giữ cache cũ khi checksum sai. `backend/tests/test_supabase_vitaldb_ingest.py` đạt 9/9; toàn bộ backend đạt 218 passed, 12 skipped. Local pgTAP/reset/database lint vẫn chờ Docker Desktop Linux engine; staging và remote migration chưa chạy.
+Đã thêm test cho cache hợp lệ, thay cache sai bằng nội dung đã xác minh và giữ cache cũ khi checksum sai. Ingest pytest đạt 9/9; toàn backend đạt 218 passed, 12 skipped. Local pgTAP/reset/database lint từng pass; Docker engine hiện không hoạt động nên chưa rerun. Không chạy staging hoặc remote migration.

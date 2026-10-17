@@ -169,7 +169,7 @@
   Chạy: python -m pytest backend/tests/test_api_backend.py -q và node --test tests/safeanes-client.test.cjs
   Kết quả mong đợi: PASS; live inference và cache replay phân biệt được, Vercel chỉ chuyển prediction tới FastAPI.
 
-  Kết quả xác minh: API 48 passed, 1 test UC05 bị loại trừ do config SHA-256 mismatch; frontend contract 8 passed; build thành công.
+  Kết quả xác minh: API 48 passed, 1 test UC05 bị loại trừ ban đầu do config SHA-256 mismatch; frontend contract 8 passed; build thành công. Mismatch line ending được sửa ở bước xác minh cuối, không thay model hash.
 
 - [x] **Step 5: Commit**
 
@@ -194,25 +194,23 @@
   Chạy: python -m pytest backend/tests/test_lambda_inference_contract.py backend/tests/test_remote_inference_contract.py backend/tests/test_model_manager_remote.py backend/tests/test_api_backend.py -q
   Kết quả mong đợi: PASS; không còn fallback điểm cố định và không có remote call thiếu xác thực.
 
-  Kết quả xác minh cập nhật: nguyên nhân integrity là checkout Windows chuyển model JSON sang CRLF, làm SHA-256 không khớp registry. Thêm `.gitattributes` giữ LF cho các JSON model và khôi phục byte gốc; hash cả năm artifact hiện khớp manifest. Aggregate contract/regression suite: 125 passed, 1 deselected; toàn bộ backend sau khi bổ sung kiểm tra VitalDB cache/manifest: 218 passed, 12 skipped, 13 warnings.
+  Kết quả xác minh cuối: nguyên nhân checksum là checkout Windows đổi model JSON sang CRLF; `.gitattributes` giữ LF cho JSON model và hash cả năm artifact khớp registry. Contract/regression suite 125 passed, 1 deselected; toàn bộ backend sau khi thêm kiểm tra integrity cho ingest đạt 218 passed, 12 skipped, 13 warnings.
 
 - [x] **Step 2: Chạy bộ kiểm thử backend hồi quy ổn định**
 
   Chạy: python -m pytest backend/tests/test_runtime_configuration.py backend/tests/test_api_backend.py backend/tests/test_uc04_inference.py backend/tests/test_uc05_inference.py -q
   Kết quả mong đợi: PASS cho nhóm kiểm thử cấu hình, API và model contract có tính xác định. Không thêm test_live_inference_replay.py vào lệnh này vì file đó có kiểm tra model/Supabase phụ thuộc môi trường.
 
-  Kết quả xác minh cập nhật: sau khi cố định line ending cho model JSON và khôi phục artifact đúng byte, `python -m pytest backend/tests -q` đạt 218 passed, 12 skipped, 13 warnings; không còn lỗi integrity/model readiness trong suite này.
+  Kết quả xác minh cuối: python -m pytest backend/tests -q đạt 218 passed, 12 skipped, 13 warnings; line ending LF giữ nguyên checksum của năm model artifact.
 
 - [x] **Step 3: Build frontend**
 
   Chạy: npm run build
   Kết quả mong đợi: PASS với source union và API proxy đã cập nhật.
 
-  Kết quả xác minh cập nhật: `npm run build` pass sau phần sửa StrictMode; Next.js compile, kiểm tra type/lint, static generation và postbuild đều thành công.
+  Kết quả xác minh cuối: npm run build pass, gồm compile, type check, static generation và postbuild.
 
 - [ ] **Step 4: Smoke test inference trên staging**
 
   Chạy Lambda smoke script đã cập nhật để xác nhận request thiếu tensors bị từ chối; sau đó gọi UC04/UC05 qua endpoint FastAPI trên Render với cấu hình staging hợp lệ. Xác nhận response có model/version provenance và LIVE_INFERENCE. Không gọi prediction endpoint Lambda từ browser.
-  Trạng thái: chưa chạy; chưa xác minh được staging service/function để gửi smoke request an toàn.
-
-  Cập nhật 2026-10-17: yêu cầu mới bao gồm hoàn tất các plan, nhưng hiện chưa xác minh được môi trường staging: Render workspace không trả service, Vercel chỉ có production deployment và không có AWS credentials/MCP session để kiểm tra Lambda staging. Không gửi inference request đến production.
+  Trạng thái: chưa chạy vì chưa xác minh được Render staging service và Lambda staging target; không gửi inference tới production.

@@ -205,4 +205,4 @@
       git add docs/operations/SAFEANES_STAGING_RELEASE_REPORT.md
       git commit -m "docs: record SafeAnes staging verification"
 
-Trạng thái kiểm tra staging ngày 2026-10-17: Render `list_services` trong workspace `My Workspace` trả về `null`; Render CLI chưa cài. Vercel project hiện chỉ có deployment `production` từ `main`. AWS MCP lỗi làm mới OAuth token và AWS CLI không có credentials. Chưa có target/credential đủ điều kiện để chạy các bước 1–5; không dùng production làm staging và không tạo service/function mới để né thiếu target.
+Trạng thái staging ngày 2026-10-17: Render workspace My Workspace hiện không trả danh sách service, Render CLI chưa cài; lần kiểm tra Vercel trước đó chỉ thấy deployment production từ main. AWS operational MCP không khả dụng và CLI không truy vấn được STS do config/credentials cục bộ lỗi định dạng. Không có staging target để chạy các bước 1–5; không dùng production làm staging, không tạo service/function mới và không trigger deploy.

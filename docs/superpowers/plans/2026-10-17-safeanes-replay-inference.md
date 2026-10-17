@@ -167,10 +167,9 @@
   Chạy: npx playwright test --config tests/integration/playwright.config.ts tests/integration/vitaldb-replay.spec.ts
   Kết quả mong đợi: PASS khi local backend/data fixtures sẵn sàng; test xác nhận waveform tiếp tục chạy trong lúc inference pending và source được ghi nhãn riêng.
 
-  Kết quả xác minh cập nhật: toàn bộ 6 test pass (52.1s). Test route/case ban đầu tái hiện `InvalidStateError` do StrictMode dọn Web Worker sau khi canvas đã chuyển sang OffscreenCanvas; cleanup hiện được trì hoãn để effect replay dùng lại worker. Assertion network cũng chọn status có nội dung lỗi vì UI có hai status cùng báo một lỗi.
+  Kết quả xác minh trước đây: 6/6 test pass (52.1s) sau khi khởi động local Next/FastAPI. Đã sửa StrictMode cleanup cho worker sau OffscreenCanvas transfer; assertion network chọn một trong hai status UI báo cùng lỗi. Lần rerun không có API service dừng ở BACKEND_UNAVAILABLE, nên không đánh giá hành vi UI.
 
 - [ ] **Step 4: Smoke test staging sau khi inference contract đã được triển khai**
 
   Replay một case, pause, seek, chuyển case, resume và reconnect stream. Xác nhận chỉ PLAYING mới schedule work, không có stale generation event, inference chậm/lỗi không làm trễ waveform SSE data.
-
-  Cập nhật 2026-10-17: chưa chạy vì không có Render staging service hoặc Lambda staging access được xác minh; Vercel hiện chỉ có deployment `production`. Không chạy replay smoke trên production.
+  Trạng thái: chưa chạy vì chưa xác minh được Render staging service hoặc Lambda staging access; không chạy smoke trên production.
