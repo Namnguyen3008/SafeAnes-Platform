@@ -61,57 +61,6 @@ async function handleSupabaseFallback(path: string[]): Promise<Response | null> 
   return null;
 }
 
-async function handleLambdaInference(path: string[], request: Request): Promise<Response | null> {
-  const lambdaUrl = process.env.SAFEANES_LAMBDA_INFERENCE_URL;
-  if (!lambdaUrl) return null;
-
-  // Match /v1/cases/:caseId/predictions/:model (e.g. uc04, uc05)
-  if (
-    path.length === 5 &&
-    path[0] === "v1" &&
-    path[1] === "cases" &&
-    path[3] === "predictions" &&
-    (path[4] === "uc04" || path[4] === "uc05")
-  ) {
-    const caseId = path[2];
-    const model = path[4];
-    const url = new URL(request.url);
-    const predictionTimeS = url.searchParams.get("prediction_time_s");
-
-    if (predictionTimeS) {
-      try {
-        const target = `${lambdaUrl.replace(/\/$/, "")}/predict/${model}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        const response = await fetch(target, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            case_id: caseId,
-            prediction_time_s: parseFloat(predictionTimeS),
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const data = await response.json();
-          return NextResponse.json(data, {
-            headers: {
-              "cache-control": "no-store, no-transform",
-              "x-safeanes-source": "AWS_SERVERLESS_LAMBDA",
-            },
-          });
-        }
-      } catch {
-        // Fall back to primary backend if Lambda call fails or times out
-      }
-    }
-  }
-  return null;
-}
-
 async function proxy(request: Request, context: RouteContext): Promise<Response> {
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "POST") {
@@ -124,9 +73,6 @@ async function proxy(request: Request, context: RouteContext): Promise<Response>
   }
 
   const { path } = await context.params;
-  const lambdaResponse = await handleLambdaInference(path, request);
-  if (lambdaResponse) return lambdaResponse;
-
   const safePath = path.map((segment) => encodeURIComponent(segment)).join("/");
   const backendOrigin = process.env.SAFEANES_API_URL ?? process.env.SAFEANES_BACKEND_URL ?? "http://127.0.0.1:8000";
   const target = new URL(`/api/${safePath}${new URL(request.url).search}`, backendOrigin);

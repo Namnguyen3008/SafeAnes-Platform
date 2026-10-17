@@ -144,3 +144,22 @@ test("TypeScript health contract requires backend identity fields", () => {
   assert.equal(health.members.find((item) => item.name?.getText(source) === "service_name").type.getText(source), '"safeanes-backend"');
   assert.equal(health.members.find((item) => item.name?.getText(source) === "build_id").type.getText(source), "string");
 });
+
+test("next_backend_proxy_does_not_call_lambda_directly", () => {
+  const root = path.join(__dirname, "..");
+  const routePath = path.join(root, "src", "app", "api", "backend", "[...path]", "route.ts");
+  const routeSource = fs.readFileSync(routePath, "utf8");
+  assert.doesNotMatch(routeSource, /SAFEANES_LAMBDA_INFERENCE_URL|handleLambdaInference/);
+  assert.match(routeSource, /SAFEANES_API_URL/);
+
+  const clientPath = path.join(root, "src", "lib", "api", "safeanesClient.ts");
+  const clientSource = fs.readFileSync(clientPath, "utf8");
+  const sourceFile = ts.createSourceFile(clientPath, clientSource, ts.ScriptTarget.Latest, true);
+  const response = sourceFile.statements.find(
+    (item) => ts.isInterfaceDeclaration(item) && item.name.text === "PredictionsResponse",
+  );
+  assert.ok(response, "missing PredictionsResponse interface");
+  const sourceField = response.members.find((member) => member.name?.getText(sourceFile) === "source");
+  assert.ok(sourceField, "missing PredictionsResponse.source");
+  assert.equal(sourceField.type.getText(sourceFile), '"LIVE_INFERENCE" | "OFFLINE_CACHE"');
+});

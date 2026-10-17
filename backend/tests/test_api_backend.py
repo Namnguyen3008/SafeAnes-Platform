@@ -1417,3 +1417,45 @@ def test_health_identity_fields_are_required_in_pydantic_and_openapi(tmp_path):
     with _client(tmp_path) as client:
         schema = client.get("/openapi.json").json()["components"]["schemas"]["HealthResponse"]
     assert {"service_name", "build_id"}.issubset(schema["required"])
+
+
+def test_uc04_and_uc05_prediction_sources_separate_live_and_cache(tmp_path):
+    settings = _backend_fixture(tmp_path)
+    runtime = BackendRuntime(settings=settings, load_models=False, vitaldb_module=_FakeVitalDB)
+    for model_id in (UC04_CONTRACT.model_id, UC05_CONTRACT.model_id):
+        service = runtime.models.services[model_id]
+        service.model = object()
+        service.readiness_status = "INTEGRATION_READY"
+        service.readiness_blockers = ()
+
+    runtime.models.predict = lambda *_args, **_kwargs: []
+    runtime.uc04_batch.cache.read_predictions = lambda case_id, **_kwargs: {
+        "case_id": case_id,
+        "model_id": UC04_CONTRACT.model_id,
+        "predictions": [],
+        "source": "OFFLINE_CACHE",
+    }
+    runtime.uc05_batch.cache.read_predictions = lambda case_id, **_kwargs: {
+        "case_id": case_id,
+        "model_id": UC05_CONTRACT.model_id,
+        "predictions": [],
+        "source": "OFFLINE_CACHE",
+    }
+
+    with TestClient(create_app(settings=settings, runtime=runtime)) as client:
+        responses = {}
+        for model in ("uc04", "uc05"):
+            responses[(model, "live")] = client.get(
+                f"/api/v1/cases/1/predictions/{model}",
+                params={"prediction_time_s": 5},
+            )
+            responses[(model, "cache")] = client.get(
+                f"/api/v1/cases/1/predictions/{model}",
+                params={"as_of_s": 5},
+            )
+
+    assert all(response.status_code == 200 for response in responses.values())
+    assert responses[("uc04", "live")].json()["source"] == "LIVE_INFERENCE"
+    assert responses[("uc05", "live")].json()["source"] == "LIVE_INFERENCE"
+    assert responses[("uc04", "cache")].json()["source"] == "OFFLINE_CACHE"
+    assert responses[("uc05", "cache")].json()["source"] == "OFFLINE_CACHE"

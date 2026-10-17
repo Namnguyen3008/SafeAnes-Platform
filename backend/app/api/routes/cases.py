@@ -106,7 +106,7 @@ def uc04_predictions(
         case_id=case_id,
         model_id=model_id,
         predictions=predictions,
-        source="ON_DEMAND",
+        source="LIVE_INFERENCE",
         available_horizons_minutes=_prediction_horizons(predictions),
     )
 
@@ -175,7 +175,7 @@ def uc05_predictions(
         case_id=case_id,
         model_id=model_id,
         predictions=predictions,
-        source="ON_DEMAND",
+        source="LIVE_INFERENCE",
         available_horizons_minutes=_prediction_horizons(predictions),
     )
 

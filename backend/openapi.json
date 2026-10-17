@@ -2791,11 +2791,11 @@
           "source": {
             "type": "string",
             "enum": [
-              "ON_DEMAND",
+              "LIVE_INFERENCE",
               "OFFLINE_CACHE"
             ],
             "title": "Source",
-            "default": "ON_DEMAND"
+            "default": "LIVE_INFERENCE"
           },
           "cache_status": {
             "anyOf": [

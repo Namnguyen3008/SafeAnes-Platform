@@ -261,7 +261,7 @@ export interface PredictionsResponse {
   case_id: string;
   model_id: string;
   predictions: PredictionItemResponse[];
-  source: "ON_DEMAND" | "OFFLINE_CACHE";
+  source: "LIVE_INFERENCE" | "OFFLINE_CACHE";
   cache_status?: "READY" | "NOT_READY" | null;
   as_of_s?: number | null;
   available_horizons_minutes: number[];

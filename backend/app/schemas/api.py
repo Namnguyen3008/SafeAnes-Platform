@@ -194,7 +194,7 @@ class PredictionsResponse(ApiModel):
     case_id: str
     model_id: str
     predictions: list[PredictionItemResponse]
-    source: Literal["ON_DEMAND", "OFFLINE_CACHE"] = "ON_DEMAND"
+    source: Literal["LIVE_INFERENCE", "OFFLINE_CACHE"] = "LIVE_INFERENCE"
     cache_status: Literal["READY", "NOT_READY"] | None = None
     as_of_s: float | None = None
     available_horizons_minutes: list[int] = Field(default_factory=list)
