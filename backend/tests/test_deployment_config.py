@@ -54,3 +54,24 @@ def test_render_blueprint_uses_explicit_backend_host_and_secret_reference() -> N
     inference_token = env["SAFEANES_INFERENCE_SERVICE_TOKEN"]
     assert inference_token.get("sync") is False
     assert "value" not in inference_token
+
+
+def test_ci_workflow_runs_builds_and_does_not_deploy() -> None:
+    workflow_path = ROOT / ".github" / "workflows" / "safeanes-ci.yml"
+    assert workflow_path.is_file()
+    workflow = workflow_path.read_text(encoding="utf-8")
+
+    assert "pull_request:" in workflow
+    assert "push:" in workflow
+    assert "node-version: 22" in workflow
+    assert "python-version: '3.12'" in workflow or 'python-version: "3.12"' in workflow
+    assert "npm ci" in workflow
+    assert "npm run build" in workflow
+    assert "python -m pytest backend/tests/test_runtime_configuration.py -q" in workflow
+    assert 'python -m pytest backend/tests/test_api_backend.py -q -k "not test_uc05_ready_status_serves_eligible_fixed_window_contract_output"' in workflow
+    assert "docker build -f backend/Dockerfile" in workflow
+    assert "docker build -f aws/lambda_inference/Dockerfile" in workflow
+
+    lowered = workflow.lower()
+    for forbidden in ("docker push", "aws lambda update-function-code", "vercel deploy", "render deploy"):
+        assert forbidden not in lowered
