@@ -209,6 +209,6 @@ Trạng thái staging ngày 2026-10-17 (xác minh lại qua Codex MCP):
 
 - Render workspace `My Workspace` đã được xác nhận; cả `mcp__render` và Render plugin đều trả `null` khi liệt kê service, kể cả preview service.
 - Vercel project `safeanes` tồn tại; 20 deployment gần nhất được truy vấn đều là `READY` trên `production`/`main`; truy vấn riêng `target=preview` trả 0 deployment.
-- AWS CLI có cài đặt nhưng chưa cấu hình region; `aws sts get-caller-identity` không xác thực được. Trong Codex hiện không có AWS operational MCP, chỉ có AWS documentation MCP.
+- AWS CLI có cài đặt nhưng `aws sts get-caller-identity` dừng trước bước xác thực: cả `~/.aws/config` và `~/.aws/credentials` đều lỗi `MissingSectionHeaderError` ở dòng đầu, nên region và identity chưa xác minh được. Trong Codex hiện không có AWS operational MCP, chỉ có AWS documentation MCP.
 
 Không có staging target để chạy các bước 1–5. Giữ nguyên các bước này ở trạng thái chưa hoàn tất; không dùng production làm staging, không tạo service/function mới và không trigger deploy cho tới khi staging target cùng quyền truy cập được cấu hình.
