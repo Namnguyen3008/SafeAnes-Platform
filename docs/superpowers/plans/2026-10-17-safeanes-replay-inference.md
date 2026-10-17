@@ -172,3 +172,5 @@
 - [ ] **Step 4: Smoke test staging sau khi inference contract đã được triển khai**
 
   Replay một case, pause, seek, chuyển case, resume và reconnect stream. Xác nhận chỉ PLAYING mới schedule work, không có stale generation event, inference chậm/lỗi không làm trễ waveform SSE data.
+
+  Cập nhật 2026-10-17: chưa chạy vì không có Render staging service hoặc Lambda staging access được xác minh; Vercel hiện chỉ có deployment `production`. Không chạy replay smoke trên production.

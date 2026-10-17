@@ -171,8 +171,8 @@ SELECT is(
     'clinical_audit_log|Allow authenticated staff to view audit logs|{authenticated}|SELECT',
     'clinical_audit_log|Allow staff to insert audit entries|{authenticated}|INSERT',
     'clinical_cases|Allow authenticated staff to read clinical cases|{authenticated}|SELECT',
-    'clinical_events|Allow authenticated staff to read events|{authenticated}|SELECT',
     'clinical_events|Allow authenticated staff to insert events|{authenticated}|INSERT',
+    'clinical_events|Allow authenticated staff to read events|{authenticated}|SELECT',
     'model_predictions|Allow authenticated staff to view predictions|{authenticated}|SELECT',
     'profiles|Allow authenticated users to read profiles|{authenticated}|SELECT',
     'profiles|Allow users to update own profile|{authenticated}|UPDATE'

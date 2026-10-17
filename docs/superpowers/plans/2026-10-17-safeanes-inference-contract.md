@@ -213,4 +213,6 @@
 - [ ] **Step 4: Smoke test inference trên staging**
 
   Chạy Lambda smoke script đã cập nhật để xác nhận request thiếu tensors bị từ chối; sau đó gọi UC04/UC05 qua endpoint FastAPI trên Render với cấu hình staging hợp lệ. Xác nhận response có model/version provenance và LIVE_INFERENCE. Không gọi prediction endpoint Lambda từ browser.
-  Trạng thái: chưa chạy; staging smoke chưa được người dùng cho phép.
+  Trạng thái: chưa chạy; chưa xác minh được staging service/function để gửi smoke request an toàn.
+
+  Cập nhật 2026-10-17: yêu cầu mới bao gồm hoàn tất các plan, nhưng hiện chưa xác minh được môi trường staging: Render workspace không trả service, Vercel chỉ có production deployment và không có AWS credentials/MCP session để kiểm tra Lambda staging. Không gửi inference request đến production.

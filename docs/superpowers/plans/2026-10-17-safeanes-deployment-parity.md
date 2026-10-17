@@ -97,6 +97,8 @@
   Chạy: python -m pytest backend/tests/test_deployment_config.py -q, npm run build và python -m pytest backend/tests/test_runtime_configuration.py backend/tests/test_api_backend.py -q
   Kết quả mong đợi: PASS; có thể chạy Docker build local nếu máy có Docker daemon, CI chạy cả hai image build trên hosted runner.
 
+  Kết quả xác minh bổ sung: Docker Desktop đã được khởi động; cả `docker build -f backend/Dockerfile -t safeanes-backend:ci .` và `docker build -f aws/lambda_inference/Dockerfile -t safeanes-lambda:ci .` đều thành công. Hai image chỉ được tạo local, không push.
+
 - [x] **Step 5: Commit workflow CI và tests**
 
       git add .github/workflows/safeanes-ci.yml backend/tests/test_deployment_config.py
@@ -202,3 +204,5 @@
 
       git add docs/operations/SAFEANES_STAGING_RELEASE_REPORT.md
       git commit -m "docs: record SafeAnes staging verification"
+
+Trạng thái kiểm tra staging ngày 2026-10-17: Render `list_services` trong workspace `My Workspace` trả về `null`; Render CLI chưa cài. Vercel project hiện chỉ có deployment `production` từ `main`. AWS MCP lỗi làm mới OAuth token và AWS CLI không có credentials. Chưa có target/credential đủ điều kiện để chạy các bước 1–5; không dùng production làm staging và không tạo service/function mới để né thiếu target.

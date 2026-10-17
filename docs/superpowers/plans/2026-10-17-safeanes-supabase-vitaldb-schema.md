@@ -51,19 +51,19 @@
 
   Chạy supabase init nhưng không thay thế migrations directory hiện có. Tạo supabase/tests/database/safeanes_vitaldb.test.sql với assertions cho đủ bốn bảng/cột bắt buộc, RLS enabled, SELECT của anon và authenticated, write bị từ chối với hai role này, service-role upsert, foreign key/window constraints, cùng tên/role policy clinical không đổi.
 
-- [ ] **Step 3: Chỉ start/reset database local và xác nhận test mới thất bại**
+- [x] **Step 3: Chỉ start/reset database local và xác nhận test mới thất bại**
 
   Chạy: supabase start, supabase db reset và supabase test db supabase/tests/database/safeanes_vitaldb.test.sql
-  Kết quả mong đợi: FAIL vì migration local hiện chỉ tạo bảng clinical_*. `npx --yes supabase@latest start --workdir .` đã được thử; Docker Desktop Linux engine không chạy nên không thể reset/test db. Binary `supabase` không có trên PATH, nhưng CLI có thể chạy qua `npx`; không dùng --linked hoặc --db-url.
+  Kết quả: Docker Desktop đã được khởi động, `supabase start` và reset local đến migration `20261011` thành công. `supabase test db ... --local` đỏ như mong đợi vì bốn bảng `safeanes_*` chưa tồn tại; không dùng `--linked` hoặc `--db-url`.
 
 - [x] **Step 4: Tạo migration chỉ bổ sung**
 
   Thêm định nghĩa bốn bảng, constraints, foreign keys, indexes, ENABLE ROW LEVEL SECURITY và SELECT grants/policies rõ ràng cho anon cùng authenticated. Không thêm public write grants/policies. Chỉ cấp quyền ghi pipeline cho service_role. Không sửa 20261011_init_safeanes.sql hoặc bất kỳ bảng/policy clinical_* nào.
 
-- [ ] **Step 5: Reset và kiểm thử database local**
+- [x] **Step 5: Reset và kiểm thử database local**
 
   Chạy: supabase db reset, supabase test db supabase/tests/database/safeanes_vitaldb.test.sql và supabase db lint --level error
-  Kết quả mong đợi: PASS; bốn bảng mới khớp client/ingest contract và clinical policy assertions không đổi. Chờ Docker daemon để chạy local stack; chưa dùng remote database làm thay thế.
+  Kết quả: `supabase db reset --local`, pgTAP RLS test (82/82) và `supabase db lint --local --level error` đều PASS; clinical policy assertions giữ nguyên. Chỉ chạy trên local database.
 
 - [x] **Step 6: Commit local config, migration và pgTAP tests**
 
@@ -128,10 +128,10 @@
 
   Chỉ cập nhật SQL type/nullability hoặc TypeScript/payload field nếu test phát hiện mismatch thật. Giữ observations, waveforms, predictions_uc04, predictions_uc05 và event value tương thích JSON. Không đổi public client read thành write hoặc thay đổi hành vi VitalDB query không liên quan.
 
-- [ ] **Step 4: Chạy parity và local database tests**
+- [x] **Step 4: Chạy parity và local database tests**
 
   Chạy: node --test tests/supabase-vitaldb-contract.test.cjs, python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và supabase test db supabase/tests/database/safeanes_vitaldb.test.sql
-  Kết quả mong đợi: PASS; Node contract test (3/3) và ingest pytest (9/9) đã pass sau khi bổ sung kiểm tra cache/checksum manifest. pgTAP local chưa chạy vì Docker daemon không khả dụng.
+  Kết quả: Node contract test (3/3), ingest pytest (9/9), pgTAP (82/82) và local schema lint đều PASS sau full local reset.
 
 - [x] **Step 5: Commit contract tests và mọi sửa parity cần thiết**
 
@@ -162,10 +162,10 @@
 
   Tạo .github/workflows/supabase-db.yml chạy khi có pull request và push tới main; cố định Supabase CLI setup qua supabase/setup-cli@v1, start stack local, reset database local, chạy pgTAP và database lint. Tài liệu phải ghi bốn bảng, tên biến môi trường bắt buộc, local --dry-run, cách cấu hình secret chỉ phía server, lỗi dự kiến khi thiếu key và staging preflight. Không ghi giá trị credential vào tài liệu.
 
-- [ ] **Step 4: Chạy toàn bộ database và credential checks local**
+- [x] **Step 4: Chạy toàn bộ database và credential checks local**
 
   Chạy: supabase start, supabase db reset, supabase test db, supabase db lint --level error, python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và node --test tests/supabase-vitaldb-contract.test.cjs
-  Kết quả mong đợi: PASS; workflow chỉ dùng local commands. Lệnh reset/pgTAP/lint cần chạy khi Docker daemon khả dụng.
+  Kết quả: `supabase start`, full local reset, pgTAP (82/82), schema lint, ingest pytest (9/9) và Node contract test (3/3) đều PASS; workflow chỉ dùng local commands.
 
 - [x] **Step 5: Chuẩn bị staging decision record nhưng không chạy remote migration**
 
