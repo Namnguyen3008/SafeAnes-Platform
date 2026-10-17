@@ -291,7 +291,7 @@ export interface ReplaySessionResponse {
   uc04_model_status: string;
   uc05_model_status: string;
   time_basis: "seconds_since_case_start";
-  generation?: number;
+  generation: number;
 }
 
 export class SafeAnesApiError extends Error {

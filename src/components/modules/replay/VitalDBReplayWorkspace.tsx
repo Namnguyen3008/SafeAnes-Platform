@@ -104,6 +104,94 @@ export function VitalDBReplayWorkspace({ module }: VitalDBReplayWorkspaceProps) 
         </div>
       )}
 
+      {module === "OVERVIEW" && (
+        <ClinicalPanel
+          title={vi ? "Inference trực tiếp và cache offline" : "Live inference and offline cache"}
+          subtitle={vi
+            ? "Inference trực tiếp có generation riêng; kết quả cache được giữ thành nguồn riêng."
+            : "Live results are generation-scoped; cached predictions remain a separate source."}
+          icon={Activity}
+          status={<StatusBadge value={replay.liveInferenceErrors.length > 0
+            ? "INFERENCE ERROR"
+            : replay.liveInferenceResults.length > 0 ? "LIVE_INFERENCE" : "WAITING"} />}
+          scrollBehavior="auto"
+        >
+          <div className="space-y-3 text-[10px]">
+            {replay.liveInferenceResults.length === 0 && replay.liveInferenceErrors.length === 0 && (
+              <p className="text-safe-text-muted">
+                {vi
+                  ? "Chưa có kết quả LIVE_INFERENCE cho generation replay hiện tại."
+                  : "No LIVE_INFERENCE result is available for the current replay generation."}
+              </p>
+            )}
+            {replay.liveInferenceResults.map((result) => (
+              <div key={`${result.model_id}-${result.prediction_time}`} className="rounded-sm border border-safe-cyan/30 bg-safe-cyan/5 p-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-bold text-safe-cyan">LIVE_INFERENCE</span>
+                  <span className="font-mono">{result.model_id}</span>
+                  <span className="text-safe-text-muted">
+                    {vi ? "Thời điểm" : "Prediction time"} {formatCaseTime(result.prediction_time)}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {result.predictions.map((prediction, index) => {
+                    const value = prediction.interpreted_output?.value ?? prediction.raw_output;
+                    const horizon = prediction.horizon_minutes_or_null;
+                    return (
+                      <span key={`${result.model_id}-${result.prediction_time}-${index}`} className="rounded-sm border border-safe-border-subtle px-1.5 py-1">
+                        {horizon == null ? (vi ? "Tổng thể" : "Overall") : `T+${horizon}m`}
+                        {" · "}
+                        {typeof value === "number" ? formatValue(value) : "—"}
+                      </span>
+                    );
+                  })}
+                  {result.predictions.length === 0 && (
+                    <span className="text-safe-text-muted">{vi ? "Model không trả horizon." : "Model returned no horizons."}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {replay.liveInferenceErrors.map((item) => (
+              <div key={`${item.model_id}-${item.prediction_time}-${item.code}`} role="status" className="rounded-sm border border-safe-red/40 bg-safe-red/5 p-2 text-safe-red">
+                <span className="font-bold">{vi ? "Inference không khả dụng" : "Inference unavailable"}</span>
+                {" · LIVE_INFERENCE · "}
+                <span className="font-mono">{item.model_id} · {item.code}</span>
+                {" · "}
+                {formatCaseTime(item.prediction_time)}
+              </div>
+            ))}
+            <div className="grid gap-2 border-t border-safe-border-subtle pt-2 md:grid-cols-2">
+              <div>
+                <div className="mb-1 font-bold text-safe-text-muted">OFFLINE_CACHE · UC04</div>
+                {replay.uc04Predictions.slice(-3).map((item, index) => (
+                  <div key={`uc04-${item.prediction_time}-${item.horizon_minutes_or_null}-${index}`} className="flex justify-between gap-2 border-b border-safe-border-subtle/60 py-1">
+                    <span>{item.horizon_minutes_or_null == null ? "—" : `T+${item.horizon_minutes_or_null}m`}</span>
+                    <span className="font-mono">{formatValue(item.interpreted_output.value)}</span>
+                    <span className="text-safe-text-muted">{formatCaseTime(item.prediction_time)}</span>
+                  </div>
+                ))}
+                {replay.uc04Predictions.length === 0 && (
+                  <p className="text-safe-text-muted">{vi ? "Không có dự đoán cache." : "No cached predictions."}</p>
+                )}
+              </div>
+              <div>
+                <div className="mb-1 font-bold text-safe-text-muted">OFFLINE_CACHE · UC05</div>
+                {replay.uc05Predictions.slice(-3).map((item, index) => (
+                  <div key={`uc05-${item.prediction_time}-${item.horizon_minutes_or_null}-${index}`} className="flex justify-between gap-2 border-b border-safe-border-subtle/60 py-1">
+                    <span>{item.horizon_minutes_or_null == null ? "—" : `T+${item.horizon_minutes_or_null}m`}</span>
+                    <span className="font-mono">{formatValue(item.interpreted_output.value)}</span>
+                    <span className="text-safe-text-muted">{formatCaseTime(item.prediction_time)}</span>
+                  </div>
+                ))}
+                {replay.uc05Predictions.length === 0 && (
+                  <p className="text-safe-text-muted">{vi ? "Không có dự đoán cache." : "No cached predictions."}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </ClinicalPanel>
+      )}
+
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.35fr)_minmax(340px,0.8fr)] gap-2">
         {(module === "UC01" || isOverview) && (
           <>

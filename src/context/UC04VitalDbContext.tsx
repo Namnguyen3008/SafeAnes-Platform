@@ -30,6 +30,13 @@ import {
 import { retainReplayEventSelectionAtTime } from "./vitalDbReplaySelection";
 import { fetchSupabaseCases } from "@/lib/api/supabaseVitalDbClient";
 
+import {
+  isCurrentReplayEvent,
+  parseInferenceEvent,
+  type LiveInferenceErrorPayload,
+  type LiveInferenceResultPayload,
+} from "@/services/inferenceEventClient";
+
 export type SafeAnesDataSourceMode = "SYNTHETIC_DEMO" | "VITALDB_REPLAY";
 export type UC04SourceMode = SafeAnesDataSourceMode;
 export type VitalDbReplayStatus = ReplaySessionResponse["status"];
@@ -62,6 +69,8 @@ export interface UC04VitalDbContextValue {
   events: Array<Record<string, unknown> & { id: string; timestamp: number; classification: "OBSERVED" | "DERIVED" }>;
   uc04Predictions: UC04VitalDbPrediction[];
   uc05Predictions: UC05VitalDbPrediction[];
+  liveInferenceResults: LiveInferenceResultPayload[];
+  liveInferenceErrors: LiveInferenceErrorPayload[];
   modelStatuses: ModelStatusResponse[];
   availability: Record<string, AvailabilityStatus>;
   dataset: string | null;
@@ -100,6 +109,8 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   const [selectedCaseDetail, setSelectedCaseDetail] = useState<CaseDetailResponse | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [session, setSession] = useState<VitalDbReplaySession | null>(null);
+  const [liveInferenceResults, setLiveInferenceResults] = useState<LiveInferenceResultPayload[]>([]);
+  const [liveInferenceErrors, setLiveInferenceErrors] = useState<LiveInferenceErrorPayload[]>([]);
   const [buffers, setBuffers] = useState<VitalDbReplayBuffers>(EMPTY_BUFFERS);
   const [selectedRecordedEvent, setSelectedRecordedEvent] = useState<VitalDbRecordedSelection | null>(null);
   // Keep source switching unavailable until the case catalog and model status
@@ -220,6 +231,23 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     return () => { cancelled = true; };
   }, []);
 
+  const updateReplaySession = useCallback((value: VitalDbReplaySession) => {
+    const next = normalizeSession(value);
+    const previous = sessionRef.current;
+    const sameReplay = previous?.session_id === next.session_id
+      && previous?.case_id === next.case_id;
+    const generationChanged = Boolean(sameReplay && previous?.generation !== next.generation);
+    if (generationChanged) {
+      setLiveInferenceResults([]);
+      setLiveInferenceErrors([]);
+    }
+    if (generationChanged && previous && !hasReplaySessionChanged(previous, next)) {
+      sessionRef.current = next;
+      setSession(next);
+      return;
+    }
+    updateSession(next);
+  }, [updateSession]);
   const createOrRestoreSession = useCallback(async (caseId: string, restart = false) => {
     const current = sessionRef.current;
     if (!restart && current?.case_id === caseId) return current;
@@ -232,7 +260,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
         if (stored?.caseId === caseId && stored.sessionId) {
           const restored = await safeAnesClient.getReplaySession(stored.sessionId);
           if (restored.case_id === caseId && selectedCaseIdRef.current === caseId) {
-            updateSession(restored);
+            updateReplaySession(restored);
             return normalizeSession(restored);
           }
         }
@@ -244,11 +272,11 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     const created = await safeAnesClient.createReplaySession(caseId, current?.speed ?? 1, 0);
     const normalized = normalizeSession(created);
     if (selectedCaseIdRef.current !== caseId) return null;
-    updateSession(normalized);
+    updateReplaySession(normalized);
     applyBuffers(EMPTY_BUFFERS);
     setSelectedRecordedEvent(null);
     return normalized;
-  }, [applyBuffers, updateSession]);
+  }, [applyBuffers, updateReplaySession]);
 
   useEffect(() => {
     if (!initialStateLoaded || mode !== "VITALDB_REPLAY" || !selectedCaseId || session?.case_id === selectedCaseId) {
@@ -292,7 +320,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     if (active?.status === "PLAYING") {
       setIsLoading(true);
       try {
-        updateSession(await safeAnesClient.pauseReplay(active.session_id));
+        updateReplaySession(await safeAnesClient.pauseReplay(active.session_id));
       } catch (cause) {
         setError(errorText(cause));
         setIsLoading(false);
@@ -302,7 +330,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     }
     persistDataSourceMode(window.sessionStorage, nextMode);
     setModeState(nextMode);
-  }, [createOrRestoreSession, selectedCaseId, updateSession]);
+  }, [createOrRestoreSession, selectedCaseId, updateReplaySession]);
 
   const selectCase = useCallback(async (caseId: string) => {
     if (!cases.some((item) => item.case_id === caseId) || caseId === selectedCaseId) return;
@@ -345,7 +373,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     try {
       const next = await replayAction(active.session_id, action, body);
       if (sessionRef.current?.session_id !== active.session_id) return;
-      updateSession(next);
+      updateReplaySession(next);
       setError(null);
     } catch (cause) {
       const errMessage = errorText(cause);
@@ -358,17 +386,17 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
             : active.current_time_s;
           const recreated = await safeAnesClient.createReplaySession(caseId, active.speed ?? 1, targetTime);
           const normalized = normalizeSession(recreated);
-          updateSession(normalized);
+          updateReplaySession(normalized);
           setError(null);
           if (action === "/play" || action === "/resume") {
             const played = await replayAction(normalized.session_id, action);
-            updateSession(played);
+            updateReplaySession(played);
           } else if (action === "/pause") {
             const paused = await replayAction(normalized.session_id, action);
-            updateSession(paused);
+            updateReplaySession(paused);
           } else if (action === "/speed") {
             const sped = await replayAction(normalized.session_id, action, body);
-            updateSession(sped);
+            updateReplaySession(sped);
           }
           return;
         } catch (recoverCause) {
@@ -379,7 +407,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
       if (sessionRef.current?.session_id !== active.session_id) return;
       setError(errMessage);
     }
-  }, [createOrRestoreSession, updateSession]);
+  }, [createOrRestoreSession, updateReplaySession]);
 
   const play = useCallback(async () => mutateSession("/play"), [mutateSession]);
   const pause = useCallback(async () => mutateSession("/pause"), [mutateSession]);
@@ -405,11 +433,16 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   }, [seek]);
 
   useEffect(() => {
+    setLiveInferenceResults([]);
+    setLiveInferenceErrors([]);
+  }, [mode, selectedCaseId, session?.session_id]);
+
+  useEffect(() => {
     if (mode !== "VITALDB_REPLAY" || !session?.session_id || session.case_id !== selectedCaseId) return;
     const source = new EventSource(safeAnesClient.replayStreamUrl(session.session_id));
     const onSnapshot = (event: Event) => {
       try {
-        updateSession(JSON.parse((event as MessageEvent<string>).data) as VitalDbReplaySession);
+        updateReplaySession(JSON.parse((event as MessageEvent<string>).data) as VitalDbReplaySession);
       } catch {
         setError("VitalDB replay sent an unreadable session update.");
       }
@@ -438,11 +471,46 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     };
     const onComplete = (event: Event) => {
       try {
-        updateSession(JSON.parse((event as MessageEvent<string>).data) as VitalDbReplaySession);
+        updateReplaySession(JSON.parse((event as MessageEvent<string>).data) as VitalDbReplaySession);
       } catch {
         // The latest session snapshot already contains the completed cursor.
       }
     };
+    const onInferenceResult = (event: Event) => {
+      const payload = parseInferenceEvent(
+        "inference_result",
+        (event as MessageEvent<string>).data,
+      );
+      if (
+        !payload
+        || payload.event !== "inference_result"
+        || !isCurrentReplayEvent(payload, sessionRef.current)
+      ) return;
+      setLiveInferenceResults((current) => [
+        ...current.filter((item) => item.model_id !== payload.model_id),
+        payload,
+      ]);
+      setLiveInferenceErrors((current) => current.filter((item) => item.model_id !== payload.model_id));
+    };
+    const onInferenceError = (event: Event) => {
+      const payload = parseInferenceEvent(
+        "inference_error",
+        (event as MessageEvent<string>).data,
+      );
+      if (
+        !payload
+        || payload.event !== "inference_error"
+        || !isCurrentReplayEvent(payload, sessionRef.current)
+      ) return;
+      setLiveInferenceErrors((current) => [
+        ...current.filter((item) => item.model_id !== payload.model_id),
+        payload,
+      ].slice(-3));
+      setLiveInferenceResults((current) => payload.model_id === "UNKNOWN"
+        ? []
+        : current.filter((item) => item.model_id !== payload.model_id));
+    };
+
     const onStreamError = (event: Event) => {
       const message = (event as MessageEvent<string>).data;
       if (!message) return; // Native EventSource reconnect/error event.
@@ -463,17 +531,21 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     source.addEventListener("snapshot", onSnapshot);
     source.addEventListener("reset", onReset);
     source.addEventListener("data", onData);
+    source.addEventListener("inference_result", onInferenceResult);
+    source.addEventListener("inference_error", onInferenceError);
     source.addEventListener("complete", onComplete);
     source.addEventListener("error", onStreamError);
     return () => {
       source.removeEventListener("snapshot", onSnapshot);
       source.removeEventListener("reset", onReset);
       source.removeEventListener("data", onData);
+      source.removeEventListener("inference_result", onInferenceResult);
+      source.removeEventListener("inference_error", onInferenceError);
       source.removeEventListener("complete", onComplete);
       source.removeEventListener("error", onStreamError);
       source.close();
     };
-  }, [applyBuffers, mode, selectedCaseId, session?.session_id, updateSession]);
+  }, [applyBuffers, mode, selectedCaseId, session?.session_id, updateReplaySession]);
 
   useEffect(() => () => {
     // EventSource is owned by the effect above and closes on session changes/unmount.
@@ -526,6 +598,8 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     events: replayEvents,
     uc04Predictions,
     uc05Predictions,
+    liveInferenceResults: mode === "VITALDB_REPLAY" ? liveInferenceResults : [],
+    liveInferenceErrors: mode === "VITALDB_REPLAY" ? liveInferenceErrors : [],
     modelStatuses,
     availability,
     dataset,
@@ -545,7 +619,8 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
     reset,
   }), [mode, setMode, cases, selectedCase, selectedCaseId, selectedCaseDetail, selectCase, session,
     replayTime, buffers, replayObservations, replayQuality, replayEvents, uc04Predictions, uc05Predictions,
-    modelStatuses, availability, dataset, datasetVersion, selectedRecordedEvent, selectRecordedEvent, isLoading, error,
+    liveInferenceResults, liveInferenceErrors, modelStatuses, availability, dataset, datasetVersion, selectedRecordedEvent,
+    selectRecordedEvent, isLoading, error,
     setSpeed, play, pause, resume, seek, reset]);
 
   return <SafeAnesDataContext.Provider value={value}>{children}</SafeAnesDataContext.Provider>;
