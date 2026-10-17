@@ -35,10 +35,8 @@ jobs:
       - name: Test backend runtime configuration
         run: python -m pytest backend/tests/test_runtime_configuration.py -q
 
-      # Keep the artifact-dependent readiness fixture out until its tracked model
-      # config hashes are reconciled with the registry; integrity checks stay enabled.
       - name: Test backend API contracts
-        run: python -m pytest backend/tests/test_api_backend.py -q -k "not test_uc05_ready_status_serves_eligible_fixed_window_contract_output"
+        run: python -m pytest backend/tests/test_api_backend.py -q
 
       - name: Build frontend
         run: npm run build

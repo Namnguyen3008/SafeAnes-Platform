@@ -158,7 +158,85 @@ class LambdaInferenceClient:
                 "Remote inference returned invalid JSON",
                 status_code=502,
             ) from None
-        if not isinstance(decoded, dict) or not isinstance(decoded.get("predictions"), list):
+        expected_model_id = "SafeAnes-UC04-HypoFormer" if model_slug == "uc04" else "SafeAnes-UC05-RespFormer"
+        expected_prediction_time = payload.get("prediction_time_s")
+        if (
+            not isinstance(decoded, dict)
+            or decoded.get("contract_version") != _CONTRACT_VERSION
+            or decoded.get("source") != "AWS_SERVERLESS_LAMBDA"
+            or decoded.get("model_id") != expected_model_id
+            or decoded.get("case_id") != payload.get("case_id")
+            or not isinstance(decoded.get("model_version"), str)
+            or not decoded["model_version"].strip()
+            or isinstance(expected_prediction_time, bool)
+            or not isinstance(expected_prediction_time, (int, float))
+            or not math.isfinite(float(expected_prediction_time))
+        ):
+            raise ApiServiceError(
+                "REMOTE_INFERENCE_INVALID_RESPONSE",
+                "Remote inference response did not match the expected contract",
+                status_code=502,
+            )
+
+        response_prediction_time = decoded.get("prediction_time")
+        if (
+            isinstance(response_prediction_time, bool)
+            or not isinstance(response_prediction_time, (int, float))
+            or not math.isfinite(float(response_prediction_time))
+            or not math.isclose(
+                float(response_prediction_time),
+                float(expected_prediction_time),
+                rel_tol=0.0,
+                abs_tol=1e-6,
+            )
+        ):
+            raise ApiServiceError(
+                "REMOTE_INFERENCE_INVALID_RESPONSE",
+                "Remote inference response did not match the expected contract",
+                status_code=502,
+            )
+
+        response_latency_ms = decoded.get("latency_ms")
+        if (
+            isinstance(response_latency_ms, bool)
+            or not isinstance(response_latency_ms, (int, float))
+            or not math.isfinite(float(response_latency_ms))
+            or float(response_latency_ms) < 0
+        ):
+            raise ApiServiceError(
+                "REMOTE_INFERENCE_INVALID_RESPONSE",
+                "Remote inference response did not match the expected contract",
+                status_code=502,
+            )
+
+        predictions = decoded.get("predictions")
+        horizons = decoded.get("available_horizons_minutes")
+        if (
+            not isinstance(predictions, list)
+            or not all(isinstance(row, dict) for row in predictions)
+            or not isinstance(horizons, list)
+            or any(type(horizon) is not int or horizon <= 0 for horizon in horizons)
+            or len(horizons) != len(set(horizons))
+        ):
+            raise ApiServiceError(
+                "REMOTE_INFERENCE_INVALID_RESPONSE",
+                "Remote inference response did not match the expected contract",
+                status_code=502,
+            )
+
+        row_horizons: list[int] = []
+        for row in predictions:
+            horizon = row.get("horizon_if_supported")
+            if horizon is None:
+                continue
+            if type(horizon) is not int or horizon <= 0:
+                raise ApiServiceError(
+                    "REMOTE_INFERENCE_INVALID_RESPONSE",
+                    "Remote inference response did not match the expected contract",
+                    status_code=502,
+                )
+            row_horizons.append(horizon)
+        if horizons != row_horizons:
             raise ApiServiceError(
                 "REMOTE_INFERENCE_INVALID_RESPONSE",
                 "Remote inference response did not match the expected contract",

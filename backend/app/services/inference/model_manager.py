@@ -54,15 +54,15 @@ class ModelManager:
         self.settings = settings
         self.vitaldb = vitaldb
         self.lambda_client = lambda_client
-        if (
-            self.lambda_client is None
-            and getattr(settings, "offload_inference", False)
-            and getattr(settings, "inference_url", None)
-        ):
+        if getattr(settings, "offload_inference", False):
+            inference_url = getattr(settings, "inference_url", None)
+            if not isinstance(inference_url, str) or not inference_url.strip():
+                raise ValueError("SAFEANES_INFERENCE_URL is required when remote inference offload is enabled")
             service_token = getattr(settings, "inference_service_token", None)
             if not service_token:
                 raise ValueError("SAFEANES_INFERENCE_SERVICE_TOKEN is required for remote inference")
-            self.lambda_client = LambdaInferenceClient(settings.inference_url, service_token)
+            if self.lambda_client is None:
+                self.lambda_client = LambdaInferenceClient(inference_url, service_token)
         self.preprocessor = TrainingPreprocessorAdapter()
         self.contracts = {UC04_CONTRACT.model_id: UC04_CONTRACT, UC05_CONTRACT.model_id: UC05_CONTRACT}
         self.service_types = {UC04_CONTRACT.model_id: UC04InferenceService, UC05_CONTRACT.model_id: UC05InferenceService}
@@ -366,6 +366,28 @@ def _remote_predictions(
 ) -> list[ModelPrediction]:
     if not isinstance(response, dict):
         raise TypeError("remote response must be an object")
+
+    response_time = response.get("prediction_time")
+    response_version = response.get("model_version")
+    response_latency_ms = response.get("latency_ms")
+    if (
+        response.get("contract_version") != "safeanes.inference.v1"
+        or response.get("source") != "AWS_SERVERLESS_LAMBDA"
+        or response.get("model_id") != contract.model_id
+        or not isinstance(response_version, str)
+        or response_version != contract.model_version
+        or response.get("case_id") != case_id
+        or isinstance(response_time, bool)
+        or not isinstance(response_time, (int, float))
+        or not math.isfinite(float(response_time))
+        or not math.isclose(float(response_time), prediction_time_s, rel_tol=0.0, abs_tol=1e-6)
+        or isinstance(response_latency_ms, bool)
+        or not isinstance(response_latency_ms, (int, float))
+        or not math.isfinite(float(response_latency_ms))
+        or float(response_latency_ms) < 0
+    ):
+        raise ValueError("remote response envelope did not match the inference contract")
+
     rows = response.get("predictions")
     if not isinstance(rows, list) or not rows:
         raise ValueError("remote response must contain predictions")
@@ -376,14 +398,19 @@ def _remote_predictions(
         if not isinstance(row, dict):
             raise TypeError("remote prediction must be an object")
         prediction = ModelPrediction(**row)
+        horizon = prediction.horizon_if_supported
+        if horizon is not None and (type(horizon) is not int or horizon <= 0):
+            raise ValueError("remote prediction horizon was invalid")
         if (
             prediction.model_id != contract.model_id
             or prediction.model_version != contract.model_version
             or prediction.case_id != case_id
+            or isinstance(prediction.prediction_time, bool)
+            or not math.isfinite(float(prediction.prediction_time))
             or not math.isclose(float(prediction.prediction_time), prediction_time_s, abs_tol=1e-6)
             or not math.isclose(float(prediction.window_start), expected_start, abs_tol=1e-6)
             or not math.isclose(float(prediction.window_end), prediction_time_s, abs_tol=1e-6)
-            or prediction.horizon_if_supported not in contract.prediction_horizons
+            or horizon not in contract.prediction_horizons
             or prediction.quality_status not in {"GOOD", "DEGRADED"}
             or not isinstance(prediction.interpreted_output, dict)
             or not math.isfinite(float(prediction.raw_output))
@@ -392,6 +419,20 @@ def _remote_predictions(
         ):
             raise ValueError("remote prediction did not match the model contract")
         predictions.append(prediction)
+
+    horizons = response.get("available_horizons_minutes")
+    row_horizons = [
+        prediction.horizon_if_supported
+        for prediction in predictions
+        if prediction.horizon_if_supported is not None
+    ]
+    if (
+        not isinstance(horizons, list)
+        or any(type(horizon) is not int or horizon <= 0 for horizon in horizons)
+        or len(horizons) != len(set(horizons))
+        or horizons != row_horizons
+    ):
+        raise ValueError("remote response horizon metadata did not match predictions")
     return predictions
 
 

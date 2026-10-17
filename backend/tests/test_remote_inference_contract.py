@@ -47,11 +47,22 @@ def test_lambda_client_sends_versioned_payload_and_bearer_token(
     monkeypatch: pytest.MonkeyPatch, model_id: str, slug: str
 ) -> None:
     captured: dict[str, Any] = {}
+    response_body = {
+        "contract_version": "safeanes.inference.v1",
+        "source": "AWS_SERVERLESS_LAMBDA",
+        "model_id": model_id,
+        "model_version": "test-model-v1",
+        "case_id": "case-1",
+        "prediction_time": 600.0,
+        "latency_ms": 12.5,
+        "available_horizons_minutes": [],
+        "predictions": [],
+    }
 
     def fake_urlopen(request: Any, *, timeout: float) -> _Response:
         captured["request"] = request
         captured["timeout"] = timeout
-        return _Response(b'{"predictions": []}')
+        return _Response(json.dumps(response_body).encode())
 
     monkeypatch.setattr(lambda_client.urllib.request, "urlopen", fake_urlopen)
     client = LambdaInferenceClient("https://lambda.example/", TOKEN)
@@ -66,7 +77,51 @@ def test_lambda_client_sends_versioned_payload_and_bearer_token(
     assert request.get_header("Content-type") == "application/json"
     assert json.loads(request.data) == payload
     assert captured["timeout"] == 10.0
-    assert result == {"predictions": []}
+    assert result == response_body
+
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("contract_version", "safeanes.inference.v0"),
+        ("source", "OFFLINE_CACHE"),
+        ("model_id", "another-model"),
+        ("model_version", ""),
+        ("case_id", "another-case"),
+        ("prediction_time", float("nan")),
+        ("available_horizons_minutes", [5]),
+        ("latency_ms", float("nan")),
+        ("latency_ms", None),
+    ],
+)
+def test_lambda_client_rejects_response_envelope_mismatch(
+    monkeypatch: pytest.MonkeyPatch, field: str, value: Any
+) -> None:
+    response_body = {
+        "contract_version": "safeanes.inference.v1",
+        "source": "AWS_SERVERLESS_LAMBDA",
+        "model_id": "SafeAnes-UC04-HypoFormer",
+        "model_version": "test-model-v1",
+        "case_id": "case-1",
+        "prediction_time": 600.0,
+        "latency_ms": 12.5,
+        "available_horizons_minutes": [],
+        "predictions": [],
+    }
+    response_body[field] = value
+    monkeypatch.setattr(
+        lambda_client.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: _Response(json.dumps(response_body).encode()),
+    )
+    client = LambdaInferenceClient("https://lambda.example", TOKEN)
+
+    with pytest.raises(ApiServiceError) as raised:
+        client.predict(_payload())
+
+    assert raised.value.code == "REMOTE_INFERENCE_INVALID_RESPONSE"
+    assert raised.value.status_code == 502
 
 
 def test_lambda_client_maps_timeout_to_sanitized_inference_error(

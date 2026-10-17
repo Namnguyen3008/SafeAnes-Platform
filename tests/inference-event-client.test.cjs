@@ -17,7 +17,7 @@ require.extensions[".ts"] = (module, filename) => {
   module._compile(outputText, filename);
 };
 
-const { isCurrentReplayEvent, parseInferenceEvent } = require(
+const { isCurrentReplayEvent, isStaleReplaySessionUpdate, parseInferenceEvent } = require(
   path.join(__dirname, "..", "src", "services", "inferenceEventClient.ts"),
 );
 
@@ -80,4 +80,16 @@ test("rejects_events_for_another_session_case_or_generation", () => {
   assert.equal(isCurrentReplayEvent(parsed, { ...session, case_id: "2" }), false);
   assert.equal(isCurrentReplayEvent(parsed, { ...session, generation: 5 }), false);
   assert.equal(isCurrentReplayEvent(parsed, { session_id: "session-1", case_id: "1" }), false);
+});
+
+
+test("rejects_stale_replay_session_snapshots_after_seek_or_reset", () => {
+  const current = { session_id: "session-1", case_id: "1", generation: 5 };
+
+  assert.equal(isStaleReplaySessionUpdate({ ...current, generation: 4 }, current), true);
+  assert.equal(isStaleReplaySessionUpdate({ ...current, generation: 5 }, current), false);
+  assert.equal(isStaleReplaySessionUpdate({ ...current, generation: 6 }, current), false);
+  assert.equal(isStaleReplaySessionUpdate({ ...current, session_id: "session-2", generation: 1 }, current), false);
+  assert.equal(isStaleReplaySessionUpdate({ ...current, case_id: "2", generation: 1 }, current), false);
+  assert.equal(isStaleReplaySessionUpdate({ ...current, generation: 4 }, null), false);
 });

@@ -133,7 +133,20 @@ class LiveInferenceWorker:
             
             service = self.model_manager._service(model_id)
             with self.model_manager._locks[service.contract.model_id]:
-                predictions = service.predict_window(window, prepared_input=prepared_input)
+                raw_predictions = service.predict_window(window, prepared_input=prepared_input)
+            predictions = []
+            for raw_prediction in raw_predictions:
+                prediction = (
+                    raw_prediction.as_dict()
+                    if callable(getattr(raw_prediction, "as_dict", None))
+                    else raw_prediction
+                )
+                if isinstance(prediction, dict) and "horizon_minutes_or_null" not in prediction:
+                    prediction = {
+                        **prediction,
+                        "horizon_minutes_or_null": prediction.get("horizon_if_supported"),
+                    }
+                predictions.append(prediction)
             
             latency_ms = round((time.perf_counter() - t0) * 1000, 2)
             coverage = None

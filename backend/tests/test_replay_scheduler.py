@@ -12,6 +12,10 @@ from backend.app.services.replay.manager import ReplayManager
 from backend.app.services.replay.replay_scheduler import ReplayInferenceScheduler
 
 
+import json
+
+from backend.app.ml.contracts.prediction import ModelPrediction
+
 def _session(
     *,
     status: str = "PLAYING",
@@ -55,6 +59,56 @@ def test_live_inference_result_is_marked_as_live() -> None:
 
     assert payload["event"] == "inference_result"
     assert payload["source"] == "LIVE_INFERENCE"
+
+
+
+def test_local_worker_serializes_model_predictions_for_sse() -> None:
+    model_id = "SafeAnes-UC04-HypoFormer"
+    prediction = ModelPrediction(
+        model_id=model_id,
+        model_version="test-model-v1",
+        case_id="case-1",
+        window_start=0.0,
+        window_end=123.0,
+        prediction_time=123.0,
+        task="test",
+        raw_output=0.25,
+        interpreted_output={"kind": "test_score", "value": 0.25},
+        horizon_if_supported=5,
+        quality_status="GOOD",
+        data_coverage=1.0,
+        missing_features=(),
+        preprocessing_version="test-preprocessor-v1",
+    )
+    prepared = SimpleNamespace(data_coverage=1.0, missing_features=())
+    service = SimpleNamespace(
+        contract=SimpleNamespace(model_id=model_id),
+        predict_window=lambda _window, *, prepared_input: [prediction],
+    )
+
+    class Loader:
+        def get_window(self, *_args):
+            return object(), prepared, {}
+
+    model_manager = SimpleNamespace(
+        settings=SimpleNamespace(offload_inference=False),
+        _service=lambda _model_id: service,
+        _locks={model_id: threading.RLock()},
+    )
+    worker = LiveInferenceWorker(model_manager, window_loader=Loader())
+    try:
+        result = worker.execute_sync("session-1", 4, "case-1", model_id, 123.0)
+    finally:
+        worker.close()
+
+    assert result is not None
+    payload = result.as_dict()
+    assert json.dumps(payload, allow_nan=False)
+    row = payload["predictions"][0]
+    assert row["horizon_if_supported"] == 5
+    assert row["horizon_minutes_or_null"] == 5
+    assert row["raw_output"] == prediction.raw_output
+    assert row["interpreted_output"] == prediction.interpreted_output
 
 
 def test_remote_worker_preserves_preprocessing_quality_metadata() -> None:

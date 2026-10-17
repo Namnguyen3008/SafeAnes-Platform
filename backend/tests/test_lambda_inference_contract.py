@@ -218,6 +218,63 @@ def test_prediction_rejects_non_finite_waveform_tensors(
     assert "predictions" not in _decode(response)
 
 
+@pytest.mark.parametrize(
+    "tensor_name,bad_value,missing_mask",
+    [
+        ("numeric", float("nan"), 1.0),
+        ("numeric", float("inf"), 0.0),
+        ("static", float("inf"), None),
+    ],
+)
+def test_prediction_rejects_non_finite_numeric_and_static_tensors(
+    monkeypatch: pytest.MonkeyPatch,
+    tensor_name: str,
+    bad_value: float,
+    missing_mask: float | None,
+) -> None:
+    monkeypatch.setenv("SAFEANES_INFERENCE_SERVICE_TOKEN", TOKEN)
+    monkeypatch.setattr(app, "get_services", lambda: pytest.fail("models loaded for invalid tensors"))
+    body = _body()
+    tensors = _prepared_tensors("uc04")
+    tensors[tensor_name][0, 0] = bad_value
+    if tensor_name == "numeric":
+        tensors["numeric_mask"][0, 0] = float(missing_mask)
+    body.update({"tensors": tensors, "window": _window("uc04")})
+
+    response = app.lambda_handler(_event(body), None)
+
+    assert response["statusCode"] == 400
+    assert "predictions" not in _decode(response)
+
+
+
+def test_lambda_normalizes_missing_numeric_values_before_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAFEANES_INFERENCE_SERVICE_TOKEN", TOKEN)
+    observed: dict[str, Any] = {}
+    monkeypatch.setattr(app, "get_services", lambda: (object(), object()))
+
+    def capture_model_input(_service: Any, request: dict[str, Any]) -> list[dict[str, Any]]:
+        observed["numeric"] = request["tensors"]["numeric"].copy()
+        observed["numeric_mask"] = request["tensors"]["numeric_mask"].copy()
+        return []
+
+    monkeypatch.setattr(app, "handle_uc04_prediction", capture_model_input)
+    body = _body()
+    tensors = _prepared_tensors("uc04")
+    tensors["numeric"][0, 0] = float("nan")
+    tensors["numeric_mask"][0, 0] = 0.0
+    body.update({"tensors": tensors, "window": _window("uc04")})
+
+    response = app.lambda_handler(_event(body), None)
+
+    assert response["statusCode"] == 200
+    assert np.isfinite(observed["numeric"]).all()
+    assert observed["numeric"][0, 0, 0] == 0.0
+    assert observed["numeric_mask"][0, 0, 0] == 0.0
+
+
 @pytest.mark.parametrize("model_id,path,tensor_name", [("uc04", "/predict/uc04", "art"), ("uc05", "/predict/uc05", "ppg")])
 def test_prediction_rejects_wrong_tensor_shape(
     monkeypatch: pytest.MonkeyPatch, model_id: str, path: str, tensor_name: str
@@ -248,7 +305,17 @@ def test_complete_prepared_contract_reaches_model_without_default_predictions(
     response = app.lambda_handler(_event(body, path=path), None)
 
     assert response["statusCode"] == 200
-    assert _decode(response)["predictions"] == []
+    payload = _decode(response)
+    expected_contract = app.UC05_CONTRACT if model_id == "uc05" else app.UC04_CONTRACT
+    assert payload["contract_version"] == CONTRACT_VERSION
+    assert payload["source"] == "AWS_SERVERLESS_LAMBDA"
+    assert payload["model_id"] == expected_contract.model_id
+    assert payload["model_version"] == expected_contract.model_version
+    assert payload["case_id"] == "case-1"
+    assert payload["prediction_time"] == 600.0
+    assert isinstance(payload["latency_ms"], (int, float)) and payload["latency_ms"] >= 0
+    assert payload["available_horizons_minutes"] == []
+    assert payload["predictions"] == []
     service = services[1] if model_id == "uc05" else services[0]
     other_service = services[0] if model_id == "uc05" else services[1]
     assert len(service.inference_test_inputs) == 1

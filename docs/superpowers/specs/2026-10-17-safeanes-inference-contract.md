@@ -29,7 +29,9 @@ Luồng hiện tại có thể gọi Lambda chỉ với mã ca và thời điể
 
 - Request có `contract_version`; tensor UC04/UC05 có schema, dtype, chiều, thứ tự feature, cửa sổ đầu vào và đơn vị được tài liệu hóa theo model hiện có. Các horizon phải khớp model tương ứng; UC04 và UC05 không dùng chung danh sách horizon nếu model contract khác nhau.
 - Response chỉ được đánh dấu thành công khi Lambda thực sự hoàn tất forward pass và tạo output hợp lệ. Response gồm ít nhất use-case/model version, `case_id`, thời điểm dự đoán, dự đoán theo horizon, thời gian xử lý và `source=LIVE_INFERENCE`.
-- Thiếu tín hiệu bắt buộc, input sai shape/đơn vị, dữ liệu không hữu hạn, model không tải được, token sai, timeout hoặc output không hợp lệ đều trả lỗi có mã và thông tin an toàn để chẩn đoán. Không chuyển lỗi đó thành điểm 0, điểm cố định, horizon mẫu hoặc kết quả cũ.
+- Sentinel missing được định nghĩa rõ theo tensor: numeric dùng JSON `null` khi `numeric_mask` bằng 0 và Lambda đổi giá trị đó thành 0 trước forward; static dùng JSON `null`, Lambda giữ NaN để UC04/UC05 tạo presence mask từ `isfinite` rồi chuẩn hóa như kiến trúc model. Infinity và NaN ở waveform/mask hoặc numeric không được mask bị từ chối.
+- `latency_ms` là thời gian Lambda bắt buộc, hữu hạn và không âm. Backend xác thực trường này; SSE/API tiếp tục hiển thị latency tổng từ FastAPI đến khi kết thúc inference, không thay bằng riêng thời gian Lambda.
+- Thiếu tín hiệu bắt buộc, input sai shape/đơn vị, dữ liệu không hữu hạn ngoài các sentinel missing được định nghĩa ở trên, model không tải được, token sai, timeout hoặc output không hợp lệ đều trả lỗi có mã và thông tin an toàn để chẩn đoán. Không chuyển lỗi đó thành điểm 0, điểm cố định, horizon mẫu hoặc kết quả cũ.
 - Cache offline là một đường đọc riêng với `source=OFFLINE_CACHE`, không phải fallback cho lỗi của live inference. UI phải giữ nguyên nhãn nguồn và không trình bày cache như kết quả model mới.
 - Token được cấu hình riêng ở backend và Lambda bằng secret phía server. Xác thực phải xảy ra trước khi nạp input hoặc gọi model; so sánh token an toàn, không ghi token vào log. Vòng đời/rotation của token thuộc cấu hình deploy.
 

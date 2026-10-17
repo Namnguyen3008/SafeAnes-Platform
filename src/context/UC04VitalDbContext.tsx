@@ -32,6 +32,7 @@ import { fetchSupabaseCases } from "@/lib/api/supabaseVitalDbClient";
 
 import {
   isCurrentReplayEvent,
+  isStaleReplaySessionUpdate,
   parseInferenceEvent,
   type LiveInferenceErrorPayload,
   type LiveInferenceResultPayload,
@@ -234,6 +235,7 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   const updateReplaySession = useCallback((value: VitalDbReplaySession) => {
     const next = normalizeSession(value);
     const previous = sessionRef.current;
+    if (isStaleReplaySessionUpdate(next, previous)) return;
     const sameReplay = previous?.session_id === next.session_id
       && previous?.case_id === next.case_id;
     const generationChanged = Boolean(sameReplay && previous?.generation !== next.generation);

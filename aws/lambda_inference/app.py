@@ -195,6 +195,7 @@ def _validate_tensors(model_key: str, raw_tensors: Any) -> dict[str, np.ndarray]
             raise InferenceRequestError(
                 "INVALID_PREPARED_TENSORS", f"{name} tensor must not contain infinity"
             )
+        # Static NaN is an explicit missing-data sentinel: both UC architectures derive a presence mask and normalize it.
         if name not in {"numeric", "static"} and np.isnan(array).any():
             raise InferenceRequestError(
                 "INVALID_PREPARED_TENSORS", f"{name} tensor must not contain NaN"
@@ -212,6 +213,11 @@ def _validate_tensors(model_key: str, raw_tensors: Any) -> dict[str, np.ndarray]
         raise InferenceRequestError(
             "INVALID_PREPARED_TENSORS", "numeric_mask must mark NaN numeric values as missing"
         )
+    # JSON null is the remote contract's explicit sentinel for masked-out numeric values.
+    # Convert that sentinel before invoking the model so non-finite inputs never cross the
+    # model boundary; the numeric mask preserves the missing-data meaning.
+    if missing_numeric.any():
+        tensors["numeric"] = np.nan_to_num(tensors["numeric"], nan=0.0)
     return tensors
 
 
@@ -359,12 +365,19 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         latency_ms = (time.perf_counter() - t0) * 1000.0
         return _response(200, {
+            "contract_version": body["contract_version"],
+            "source": "AWS_SERVERLESS_LAMBDA",
             "case_id": body["case_id"],
             "model_id": model_id,
+            "model_version": (UC05_CONTRACT if model_key == "uc05" else UC04_CONTRACT).model_version,
+            "prediction_time": body["prediction_time_s"],
             "predictions": [p.as_dict() if hasattr(p, "as_dict") else p for p in predictions],
-            "source": "AWS_SERVERLESS_LAMBDA",
             "latency_ms": round(latency_ms, 2),
-            "available_horizons_minutes": [p.get("horizon_if_supported") for p in predictions if isinstance(p, dict) and p.get("horizon_if_supported")]
+            "available_horizons_minutes": [
+                p.get("horizon_if_supported")
+                for p in predictions
+                if isinstance(p, dict) and p.get("horizon_if_supported") is not None
+            ],
         })
     except InferenceRequestError as exc:
         return _response(400, {"error": {"code": exc.code, "message": str(exc)}})

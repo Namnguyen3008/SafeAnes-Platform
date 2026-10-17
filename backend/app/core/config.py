@@ -108,8 +108,11 @@ class Settings:
             raise ValueError("SAFEANES_INFERENCE_SERVICE_TOKEN must contain ASCII non-whitespace characters only")
         if self.environment == "production" and (not self.api_token or len(self.api_token) < 16):
             raise ValueError("SAFEANES_API_TOKEN must be set to at least 16 characters in production")
-        if self.offload_inference and self.inference_url and not self.inference_service_token:
-            raise ValueError("SAFEANES_INFERENCE_SERVICE_TOKEN is required when remote inference offload is enabled")
+        if self.offload_inference:
+            if not isinstance(self.inference_url, str) or not self.inference_url.strip():
+                raise ValueError("SAFEANES_INFERENCE_URL is required when remote inference offload is enabled")
+            if not self.inference_service_token:
+                raise ValueError("SAFEANES_INFERENCE_SERVICE_TOKEN is required when remote inference offload is enabled")
         _parse_hosts(",".join(self.allowed_hosts))
         if (
             not math.isfinite(self.max_signal_range_seconds)

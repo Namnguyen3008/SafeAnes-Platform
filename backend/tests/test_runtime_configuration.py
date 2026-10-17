@@ -54,6 +54,17 @@ def test_remote_inference_requires_service_token_when_offload_is_enabled(
         )
 
 
+
+def test_remote_inference_requires_url_when_offload_is_enabled() -> None:
+    with pytest.raises(ValueError, match="SAFEANES_INFERENCE_URL"):
+        Settings(
+            data_root=Path("data"),
+            model_root=Path("models"),
+            offload_inference=True,
+            inference_service_token="test-service-token",
+        )
+
+
 def test_production_settings_require_an_access_token() -> None:
     with pytest.raises(ValueError, match="SAFEANES_API_TOKEN"):
         Settings(data_root=Path("data"), model_root=Path("models"), environment="production")

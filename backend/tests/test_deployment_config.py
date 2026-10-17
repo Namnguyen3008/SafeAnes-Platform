@@ -71,7 +71,8 @@ def test_ci_workflow_runs_builds_and_does_not_deploy() -> None:
     assert "npm ci" in workflow
     assert "npm run build" in workflow
     assert "python -m pytest backend/tests/test_runtime_configuration.py -q" in workflow
-    assert 'python -m pytest backend/tests/test_api_backend.py -q -k "not test_uc05_ready_status_serves_eligible_fixed_window_contract_output"' in workflow
+    assert "python -m pytest backend/tests/test_api_backend.py -q" in workflow
+    assert "test_uc05_ready_status_serves_eligible_fixed_window_contract_output" not in workflow
     assert "docker build -f backend/Dockerfile" in workflow
     assert "docker build -f aws/lambda_inference/Dockerfile" in workflow
 

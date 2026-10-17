@@ -105,6 +105,21 @@ export function isCurrentReplayEvent(
   );
 }
 
+
+export function isStaleReplaySessionUpdate(
+  next: ReplaySessionResponse,
+  current: ReplaySessionResponse | null,
+): boolean {
+  if (!current || next.session_id !== current.session_id || next.case_id !== current.case_id) {
+    return false;
+  }
+  return (
+    !Number.isInteger(next.generation)
+    || !Number.isInteger(current.generation)
+    || next.generation < current.generation
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
