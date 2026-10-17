@@ -7,7 +7,7 @@ services:
     region: singapore
     plan: standard
     healthCheckPath: /api/v1/health/live
-    autoDeploy: true
+    autoDeployTrigger: commit
     envVars:
       - key: SAFEANES_ENV
         value: production
@@ -18,11 +18,13 @@ services:
       - key: SAFEANES_DATA_ROOT
         value: /app/data
       - key: SAFEANES_MODEL_ROOT
-        value: /app/models
+        value: /models
       - key: SAFEANES_CORS_ORIGINS
         value: "https://safeanes.vercel.app,http://localhost:3000"
       - key: SAFEANES_ALLOWED_HOSTS
-        value: "*"
+        value: safeanes-backend-kfjc.onrender.com
+      - key: SAFEANES_INFERENCE_SERVICE_TOKEN
+        sync: false
       - key: SAFEANES_API_TOKEN
         generateValue: true
       - key: SAFEANES_MAX_SIGNAL_RANGE_SECONDS

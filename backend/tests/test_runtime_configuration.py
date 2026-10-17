@@ -160,3 +160,22 @@ def test_backend_build_id_supports_bounded_safe_release_names(monkeypatch):
     for value in ("release-17.2+cpu_debug", "a" * 128):
         monkeypatch.setenv("SAFEANES_BUILD_ID", value)
         assert get_backend_build_id() == value
+
+
+def test_default_model_root_resolves_to_repository_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SAFEANES_MODEL_ROOT", raising=False)
+    monkeypatch.setenv("SAFEANES_ENV", "local")
+
+    settings = Settings.from_env()
+    project = Path(__file__).resolve().parents[2]
+
+    assert settings.model_root == (project / "models").resolve()
+
+
+def test_settings_reject_wildcard_allowed_hosts() -> None:
+    with pytest.raises(ValueError, match="SAFEANES_ALLOWED_HOSTS"):
+        Settings(
+            data_root=Path("data"),
+            model_root=Path("models"),
+            allowed_hosts=("*",),
+        )

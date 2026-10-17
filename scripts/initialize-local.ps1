@@ -41,13 +41,13 @@ foreach ($key in @("UC04_MODEL_PATH", "UC05_MODEL_PATH")) {
     $entry = $expected[$key]
     $artifactPath = Resolve-ConfiguredPath $values[$key] (Join-Path $modelRoot $entry.artifact_path)
     if (-not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) {
-        Write-Warning "$key is missing; the corresponding model will report MODEL_NOT_READY."
+        Write-Warning "$key is missing. Registered artifact path: $($entry.artifact_path). Set SAFEANES_MODEL_ROOT to the model root containing that path, or set $key to the registered path."
         $artifactsReady = $false
         continue
     }
     $actualHash = (Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -ne $entry.artifact_sha256.ToLowerInvariant()) {
-        Write-Warning "$key failed its registered SHA-256 check; model loading will be blocked."
+        Write-Warning "$key failed its registered SHA-256 check for $($entry.artifact_path); restore the audited artifact before starting the backend."
         $artifactsReady = $false
         continue
     }
