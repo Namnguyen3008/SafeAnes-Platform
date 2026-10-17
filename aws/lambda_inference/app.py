@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hmac
 import logging
 import math
 import os
@@ -25,6 +26,7 @@ from backend.app.ml.contracts.window import InferenceWindow
 from backend.app.ml.inference.uc04 import UC04InferenceService
 from backend.app.ml.inference.uc05 import UC05InferenceService
 from backend.app.ml.preprocessing.uc04 import PreparedUC04Input
+from backend.app.ml.preprocessing.uc05 import PreparedUC05Input
 from backend.app.ml.registry.contracts import UC04_CONTRACT, UC05_CONTRACT
 
 MODELS_ROOT = CURRENT_DIR / "models"
@@ -77,6 +79,221 @@ def _response(status_code: int, body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+class InferenceRequestError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+_UC04_TENSOR_NAMES = (
+    "art", "ecg", "ppg", "capno", "numeric", "numeric_mask", "static", "modality_mask"
+)
+_UC05_TENSOR_NAMES = (
+    "capno", "awp", "ppg", "flow", "resp", "numeric", "numeric_mask", "static", "wave_mask"
+)
+_UC04_REQUIRED_TRACKS = {
+    "ART_WAVE": "SNUADC/ART",
+    "MAP": "Solar8000/ART_MBP",
+    "HR": "Solar8000/HR",
+}
+_UC05_REQUIRED_TRACKS = {
+    "SPO2": "Solar8000/PLETH_SPO2",
+    "capno": "Primus/CO2",
+    "awp": "Primus/AWP",
+    "ppg": "SNUADC/PLETH",
+}
+
+
+def _authorize_request(event: dict[str, Any]) -> bool:
+    expected_token = os.environ.get("SAFEANES_INFERENCE_SERVICE_TOKEN", "")
+    if not expected_token:
+        return False
+
+    headers = event.get("headers")
+    if not isinstance(headers, dict):
+        return False
+    authorization = next(
+        (value for key, value in headers.items() if str(key).lower() == "authorization"),
+        None,
+    )
+    if not isinstance(authorization, str):
+        return False
+    scheme, separator, presented_token = authorization.partition(" ")
+    if not separator or scheme.lower() != "bearer" or not presented_token:
+        return False
+    return hmac.compare_digest(
+        presented_token.encode("utf-8"), expected_token.encode("utf-8")
+    )
+
+
+def _resolve_model_key(body: dict[str, Any], raw_path: str) -> str:
+    path_value = raw_path.lower()
+    path_model = "uc05" if "uc05" in path_value or "respformer" in path_value else (
+        "uc04" if "uc04" in path_value or "hypoformer" in path_value else None
+    )
+    requested = body.get("model_id")
+    if requested is None:
+        model_key = path_model
+    else:
+        value = str(requested).lower()
+        if value in {"uc04", UC04_CONTRACT.model_id.lower(), "hypoformer"}:
+            model_key = "uc04"
+        elif value in {"uc05", UC05_CONTRACT.model_id.lower(), "respformer"}:
+            model_key = "uc05"
+        else:
+            raise InferenceRequestError("UNSUPPORTED_MODEL", "model_id is not supported")
+        if path_model is not None and path_model != model_key:
+            raise InferenceRequestError("MODEL_ROUTE_MISMATCH", "model_id does not match the request path")
+
+    if model_key is None:
+        raise InferenceRequestError("UNSUPPORTED_MODEL", "request path must identify UC04 or UC05")
+    return model_key
+
+
+def _finite_number(value: Any, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", f"{field_name} must be a finite number")
+    number = float(value)
+    if not math.isfinite(number):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", f"{field_name} must be a finite number")
+    return number
+
+
+def _validate_tensors(model_key: str, raw_tensors: Any) -> dict[str, np.ndarray]:
+    if not isinstance(raw_tensors, dict):
+        raise InferenceRequestError("PREPARED_TENSORS_REQUIRED", "prepared tensors are required")
+
+    contract = UC05_CONTRACT if model_key == "uc05" else UC04_CONTRACT
+    expected_names = _UC05_TENSOR_NAMES if model_key == "uc05" else _UC04_TENSOR_NAMES
+    supplied_names = set(raw_tensors)
+    missing = set(expected_names) - supplied_names
+    unexpected = supplied_names - set(expected_names)
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append("missing: " + ", ".join(sorted(missing)))
+        if unexpected:
+            details.append("unexpected: " + ", ".join(sorted(unexpected)))
+        raise InferenceRequestError("INVALID_PREPARED_TENSORS", "; ".join(details))
+
+    tensors: dict[str, np.ndarray] = {}
+    for name in expected_names:
+        try:
+            array = np.asarray(raw_tensors[name], dtype=np.float32)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise InferenceRequestError(
+                "INVALID_PREPARED_TENSORS", f"{name} must contain numeric values"
+            ) from exc
+
+        expected_shape = tuple(1 if size is None else size for size in contract.input_shape[name])
+        if array.shape != expected_shape:
+            raise InferenceRequestError(
+                "INVALID_PREPARED_TENSORS",
+                f"{name} tensor shape must be {expected_shape}",
+            )
+        if np.isinf(array).any():
+            raise InferenceRequestError(
+                "INVALID_PREPARED_TENSORS", f"{name} tensor must not contain infinity"
+            )
+        if name not in {"numeric", "static"} and np.isnan(array).any():
+            raise InferenceRequestError(
+                "INVALID_PREPARED_TENSORS", f"{name} tensor must not contain NaN"
+            )
+        tensors[name] = array
+
+    mask_names = ("numeric_mask", "modality_mask") if model_key == "uc04" else ("numeric_mask", "wave_mask")
+    for name in mask_names:
+        if not np.isin(tensors[name], (0.0, 1.0)).all():
+            raise InferenceRequestError(
+                "INVALID_PREPARED_TENSORS", f"{name} must contain only 0 or 1"
+            )
+    missing_numeric = np.isnan(tensors["numeric"])
+    if np.any(missing_numeric & (tensors["numeric_mask"] >= 0.5)):
+        raise InferenceRequestError(
+            "INVALID_PREPARED_TENSORS", "numeric_mask must mark NaN numeric values as missing"
+        )
+    return tensors
+
+
+def _validate_prediction_request(body: Any, model_key: str) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "request body must be a JSON object")
+    if body.get("contract_version") != "safeanes.inference.v1":
+        raise InferenceRequestError(
+            "UNSUPPORTED_CONTRACT_VERSION", "contract_version must be safeanes.inference.v1"
+        )
+
+    case_id = body.get("case_id")
+    if not isinstance(case_id, str) or not case_id.strip():
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "case_id is required")
+    prediction_time = _finite_number(body.get("prediction_time_s"), "prediction_time_s")
+    if prediction_time < 0:
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "prediction_time_s must be non-negative")
+
+    window = body.get("window")
+    if not isinstance(window, dict):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "window metadata is required")
+    window_start = _finite_number(window.get("window_start_s"), "window.window_start_s")
+    window_end = _finite_number(window.get("window_end_s"), "window.window_end_s")
+    duration = 600.0 if model_key == "uc05" else 300.0
+    if abs(window_start - (prediction_time - duration)) > 1e-6:
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "window_start_s does not match model history")
+    if abs(window_end - prediction_time) > 1e-6:
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "window_end_s must match prediction_time_s")
+
+    required_tracks = _UC05_REQUIRED_TRACKS if model_key == "uc05" else _UC04_REQUIRED_TRACKS
+    selected_tracks = window.get("selected_tracks")
+    if not isinstance(selected_tracks, dict) or any(
+        selected_tracks.get(role) != track for role, track in required_tracks.items()
+    ):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "selected_tracks do not satisfy the model contract")
+
+    quality_status = body.get("quality_status")
+    if not isinstance(quality_status, str) or quality_status not in ("GOOD", "DEGRADED"):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "quality_status must be GOOD or DEGRADED")
+    data_coverage = _finite_number(body.get("data_coverage"), "data_coverage")
+    if not 0.0 <= data_coverage <= 1.0:
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "data_coverage must be between 0 and 1")
+    missing_features = body.get("missing_features")
+    if not isinstance(missing_features, list) or any(not isinstance(value, str) for value in missing_features):
+        raise InferenceRequestError("INVALID_INFERENCE_REQUEST", "missing_features must be a string array")
+
+    return {
+        **body,
+        "case_id": case_id.strip(),
+        "prediction_time_s": prediction_time,
+        "quality_status": quality_status,
+        "data_coverage": data_coverage,
+        "missing_features": tuple(missing_features),
+        "window": {
+            **window,
+            "window_start_s": window_start,
+            "window_end_s": window_end,
+            "selected_tracks": dict(selected_tracks),
+        },
+        "tensors": _validate_tensors(model_key, body.get("tensors")),
+    }
+
+
+def _inference_window(service: Any, body: dict[str, Any]) -> InferenceWindow:
+    prediction_time = body["prediction_time_s"]
+    window_meta = body["window"]
+    numeric_features = tuple(service.contract.feature_order["numeric"])
+    return InferenceWindow(
+        case_id=body["case_id"],
+        window_start_s=window_meta["window_start_s"],
+        window_end_s=window_meta["window_end_s"],
+        prediction_time_s=prediction_time,
+        numeric_values=np.empty((0, len(numeric_features)), dtype=np.float32),
+        numeric_feature_order=numeric_features,
+        numeric_sample_rate_hz=1.0,
+        numeric_start_time_s=prediction_time,
+        static_features={},
+        selected_tracks=window_meta["selected_tracks"],
+        source_available_through_s=prediction_time,
+    )
+
+
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     http_method = (
         event.get("requestContext", {}).get("http", {}).get("method")
@@ -102,26 +319,38 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             },
         })
 
+    if not os.environ.get("SAFEANES_INFERENCE_SERVICE_TOKEN", ""):
+        return _response(503, {"error": {"code": "SERVICE_AUTH_NOT_CONFIGURED", "message": "inference service authentication is not configured"}})
+    if not _authorize_request(event):
+        return _response(401, {"error": {"code": "UNAUTHORIZED", "message": "valid bearer authentication is required"}})
+    if http_method != "POST":
+        return _response(405, {"error": {"code": "METHOD_NOT_ALLOWED", "message": "inference requests require POST"}})
+
     # Parse request body
     body_raw = event.get("body")
-    if not body_raw:
-        body = {}
-    elif isinstance(body_raw, str):
+    if isinstance(body_raw, str):
         try:
             body = json.loads(body_raw)
         except Exception as exc:
-            return _response(400, {"error": {"code": "INVALID_JSON", "message": str(exc)}})
+            return _response(400, {"error": {"code": "INVALID_JSON", "message": "request body is not valid JSON"}})
     elif isinstance(body_raw, dict):
         body = body_raw
     else:
-        body = {}
+        return _response(400, {"error": {"code": "INVALID_JSON", "message": "request body must be a JSON object"}})
+    if not isinstance(body, dict):
+        return _response(400, {"error": {"code": "INVALID_JSON", "message": "request body must be a JSON object"}})
 
-    model_target = body.get("model_id") or ("uc05" if "uc05" in raw_path.lower() else "uc04")
+    try:
+        model_key = _resolve_model_key(body, raw_path)
+        body = _validate_prediction_request(body, model_key)
+    except InferenceRequestError as exc:
+        return _response(400, {"error": {"code": exc.code, "message": str(exc)}})
+
     t0 = time.perf_counter()
 
     try:
         uc04, uc05 = get_services()
-        if "uc05" in model_target.lower() or "respformer" in model_target.lower():
+        if model_key == "uc05":
             predictions = handle_uc05_prediction(uc05, body)
             model_id = UC05_CONTRACT.model_id
         else:
@@ -130,13 +359,15 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         latency_ms = (time.perf_counter() - t0) * 1000.0
         return _response(200, {
-            "case_id": body.get("case_id", "unknown"),
+            "case_id": body["case_id"],
             "model_id": model_id,
             "predictions": [p.as_dict() if hasattr(p, "as_dict") else p for p in predictions],
             "source": "AWS_SERVERLESS_LAMBDA",
             "latency_ms": round(latency_ms, 2),
             "available_horizons_minutes": [p.get("horizon_if_supported") for p in predictions if isinstance(p, dict) and p.get("horizon_if_supported")]
         })
+    except InferenceRequestError as exc:
+        return _response(400, {"error": {"code": exc.code, "message": str(exc)}})
     except Exception as exc:
         logger.exception("Inference execution failed")
         return _response(500, {
@@ -149,133 +380,38 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 
 def handle_uc04_prediction(service: UC04InferenceService, body: dict[str, Any]) -> list[dict[str, Any]]:
-    tensors = body.get("tensors")
-    window_meta = body.get("window", {})
-    
-    # If client passed serialized tensors:
-    if tensors:
-        art = np.asarray(tensors["art"], dtype=np.float32)
-        ecg = np.asarray(tensors["ecg"], dtype=np.float32)
-        ppg = np.asarray(tensors["ppg"], dtype=np.float32)
-        capno = np.asarray(tensors["capno"], dtype=np.float32)
-        numeric = np.asarray(tensors["numeric"], dtype=np.float32)
-        numeric_mask = np.asarray(tensors["numeric_mask"], dtype=np.float32)
-        static = np.asarray(tensors["static"], dtype=np.float32)
-        modality_mask = np.asarray(tensors["modality_mask"], dtype=np.float32)
-
-        prepared = PreparedUC04Input(
-            art=art,
-            ecg=ecg,
-            ppg=ppg,
-            capno=capno,
-            numeric=numeric,
-            numeric_mask=numeric_mask,
-            static=static,
-            modality_mask=modality_mask,
-            data_coverage=float(body.get("data_coverage", 1.0)),
-            quality_status=str(body.get("quality_status", "PASS")),
-            missing_features=list(body.get("missing_features", [])),
-        )
-        
-        prediction_time = float(body.get("prediction_time_s", window_meta.get("prediction_time_s", 300.0)))
-        window = InferenceWindow(
-            case_id=str(body.get("case_id", "1")),
-            window_start_s=float(window_meta.get("window_start_s", max(0.0, prediction_time - 300.0))),
-            window_end_s=float(window_meta.get("window_end_s", prediction_time)),
-            prediction_time_s=prediction_time,
-            numeric_feature_order=tuple(service.contract.feature_order["numeric"]),
-            waveform_feature_order=tuple(service.contract.feature_order["waveform"]),
-            selected_tracks=dict(window_meta.get("selected_tracks", {})),
-            raw_data={},
-        )
-        preds = service.predict_window(window, prepared_input=prepared)
-        return [p.to_dict() if hasattr(p, "to_dict") else p.__dict__ for p in preds]
-    
-    # If client passed raw request (case_id + prediction_time_s without tensors),
-    # construct demo baseline prediction according to model contract
-    prediction_time = float(body.get("prediction_time_s", 300.0))
-    case_id = str(body.get("case_id", "1"))
-    
-    return [
-        {
-            "model_id": service.contract.model_id,
-            "model_version": service.contract.model_version,
-            "case_id": case_id,
-            "window_start": max(0.0, prediction_time - 300.0),
-            "window_end": prediction_time,
-            "prediction_time": prediction_time,
-            "task": service.contract.task,
-            "raw_output": -1.386,
-            "interpreted_output": {
-                "kind": "uncalibrated_sigmoid_score",
-                "value": 0.20,
-                "calibrated": False,
-                "threshold": 0.5,
-                "threshold_decision": False,
-            },
-            "horizon_if_supported": horizon,
-            "quality_status": "PASS",
-            "data_coverage": 1.0,
-            "missing_features": [],
-            "preprocessing_version": "1.0.0",
-            "confidence": None,
-            "source_tracks": {},
-        }
-        for horizon in [5, 10, 15]
-    ]
+    tensors = body["tensors"]
+    prepared = PreparedUC04Input(
+        art=tensors["art"],
+        ecg=tensors["ecg"],
+        ppg=tensors["ppg"],
+        capno=tensors["capno"],
+        numeric=tensors["numeric"],
+        numeric_mask=tensors["numeric_mask"],
+        static=tensors["static"],
+        modality_mask=tensors["modality_mask"],
+        data_coverage=body["data_coverage"],
+        quality_status=body["quality_status"],
+        missing_features=body["missing_features"],
+    )
+    preds = service.predict_window(_inference_window(service, body), prepared_input=prepared)
+    return [p.to_dict() if hasattr(p, "to_dict") else p.__dict__ for p in preds]
 
 
 def handle_uc05_prediction(service: UC05InferenceService, body: dict[str, Any]) -> list[dict[str, Any]]:
-    tensors = body.get("tensors")
-    window_meta = body.get("window", {})
-    
-    prediction_time = float(body.get("prediction_time_s", window_meta.get("prediction_time_s", 300.0)))
-    case_id = str(body.get("case_id", "1"))
-
-    if tensors:
-        # Client passed prepared tensors for UC05
-        # forward pass via service.predict_window
-        window = InferenceWindow(
-            case_id=case_id,
-            window_start_s=float(window_meta.get("window_start_s", max(0.0, prediction_time - 300.0))),
-            window_end_s=float(window_meta.get("window_end_s", prediction_time)),
-            prediction_time_s=prediction_time,
-            numeric_feature_order=tuple(service.contract.feature_order["numeric"]),
-            waveform_feature_order=tuple(service.contract.feature_order["waveform"]),
-            selected_tracks=dict(window_meta.get("selected_tracks", {})),
-            raw_data={},
-        )
-        preds = service.predict_window(window, prepared_input=tensors)
-        return [p.to_dict() if hasattr(p, "to_dict") else p.__dict__ for p in preds]
-
-    # Default calibrated response
-    return [
-        {
-            "model_id": service.contract.model_id,
-            "model_version": service.contract.model_version,
-            "case_id": case_id,
-            "window_start": max(0.0, prediction_time - 300.0),
-            "window_end": prediction_time,
-            "prediction_time": prediction_time,
-            "task": service.contract.task,
-            "raw_output": -1.82,
-            "interpreted_output": {
-                "kind": "isotonic_calibrated_probability",
-                "value": 0.14,
-                "calibrated": True,
-                "threshold": 0.35,
-                "threshold_decision": False,
-            },
-            "horizon_if_supported": horizon,
-            "quality_status": "PASS",
-            "data_coverage": 1.0,
-            "missing_features": [],
-            "preprocessing_version": "1.0.0",
-            "confidence": None,
-            "source_tracks": {},
-        }
-        for horizon in [5, 10, 15]
-    ]
+    tensors = body["tensors"]
+    prepared = PreparedUC05Input(
+        waves={name: tensors[name] for name in ("capno", "awp", "ppg", "flow", "resp")},
+        numeric=tensors["numeric"],
+        numeric_mask=tensors["numeric_mask"],
+        static=tensors["static"],
+        wave_mask=tensors["wave_mask"],
+        quality_status=body["quality_status"],
+        data_coverage=body["data_coverage"],
+        missing_features=body["missing_features"],
+    )
+    preds = service.predict_window(_inference_window(service, body), prepared_input=prepared)
+    return [p.to_dict() if hasattr(p, "to_dict") else p.__dict__ for p in preds]
 
 
 if __name__ == "__main__":
