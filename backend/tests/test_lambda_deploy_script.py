@@ -57,3 +57,46 @@ def test_deploy_output_includes_ecr_digest_without_secret_values(monkeypatch, ca
     assert len(update_commands) == 1
     assert f"--image-uri 127091441306.dkr.ecr.ap-southeast-1.amazonaws.com/safeanes-inference@{digest}" in update_commands[0]
     assert all(":latest" not in command for command in commands)
+
+
+def test_deploy_targets_explicit_staging_function(monkeypatch) -> None:
+    digest = "sha256:" + ("b" * 64)
+    commands = []
+
+    def fake_run_cmd(command: str, check: bool = True) -> str:
+        commands.append(command)
+        if "describe-images" in command:
+            return json.dumps({"imageDetails": [{"imageDigest": digest}]})
+        if "get-function-url-config" in command:
+            return json.dumps({"FunctionUrl": "https://safeanes-staging.lambda-url.example/"})
+        if "get-function " in command:
+            return json.dumps({"Configuration": {"State": "Active"}})
+        return ""
+
+    monkeypatch.setattr(deploy_lambda, "run_cmd", fake_run_cmd)
+
+    deploy_lambda.deploy("release-18", function_name="safeanes-inference-staging")
+
+    lambda_commands = [command for command in commands if "aws lambda " in command]
+    assert lambda_commands
+    assert all("--function-name safeanes-inference-staging" in command for command in lambda_commands)
+    assert all("--function-name safeanes-inference " not in command for command in lambda_commands)
+
+
+def test_main_accepts_explicit_lambda_function_name(monkeypatch) -> None:
+    selected = {}
+
+    def fake_deploy(build_id: str | None = None, function_name: str = deploy_lambda.FUNCTION_NAME):
+        selected["build_id"] = build_id
+        selected["function_name"] = function_name
+
+    monkeypatch.setattr(deploy_lambda, "deploy", fake_deploy)
+
+    deploy_lambda.main(["--function-name", "safeanes-inference-staging"])
+
+    assert selected == {"build_id": None, "function_name": "safeanes-inference-staging"}
+
+
+def test_deploy_rejects_shell_metacharacters_in_function_name() -> None:
+    with pytest.raises(ValueError, match="SAFEANES_LAMBDA_FUNCTION_NAME"):
+        deploy_lambda.deploy("release-18", function_name="safeanes-staging; whoami")

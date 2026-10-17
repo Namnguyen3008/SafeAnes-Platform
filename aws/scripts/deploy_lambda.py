@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -68,8 +69,15 @@ def _image_digest_for_tag(image_tag: str) -> str:
     return digest
 
 
-def deploy(build_id: str | None = None) -> str | None:
+def _validate_function_name(function_name: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", function_name):
+        raise ValueError("SAFEANES_LAMBDA_FUNCTION_NAME must contain 1-64 letters, digits, hyphens, or underscores")
+    return function_name
+
+
+def deploy(build_id: str | None = None, function_name: str = FUNCTION_NAME) -> str | None:
     validated_id = _resolve_build_id(build_id)
+    validated_function_name = _validate_function_name(function_name)
     tag = image_tag_for_build(validated_id)
     tagged_image_uri = image_uri_for_build(validated_id)
     immutable_image_uri: str | None = None
@@ -97,7 +105,7 @@ def deploy(build_id: str | None = None) -> str | None:
 
     print("\n=== Step 4: Create or Update Lambda Function ===")
     check_fn = run_cmd(
-        f"aws lambda get-function --function-name {FUNCTION_NAME} --region {REGION}",
+        f"aws lambda get-function --function-name {validated_function_name} --region {REGION}",
         check=False,
     )
 
@@ -105,7 +113,7 @@ def deploy(build_id: str | None = None) -> str | None:
         print("Creating Lambda function...")
         create_cmd = (
             f"aws lambda create-function "
-            f"--function-name {FUNCTION_NAME} "
+            f"--function-name {validated_function_name} "
             f"--package-type Image "
             f"--code ImageUri={immutable_image_uri} "
             f"--role {ROLE_ARN} "
@@ -115,20 +123,20 @@ def deploy(build_id: str | None = None) -> str | None:
         )
         run_cmd(create_cmd)
         print("Waiting for function active...")
-        run_cmd(f"aws lambda wait function-active-v2 --function-name {FUNCTION_NAME} --region {REGION}")
+        run_cmd(f"aws lambda wait function-active-v2 --function-name {validated_function_name} --region {REGION}")
     else:
         print("Updating Lambda function code...")
         update_cmd = (
-            f"aws lambda update-function-code --function-name {FUNCTION_NAME} "
+            f"aws lambda update-function-code --function-name {validated_function_name} "
             f"--image-uri {immutable_image_uri} --region {REGION}"
         )
         run_cmd(update_cmd)
         print("Waiting for function updated...")
-        run_cmd(f"aws lambda wait function-updated-v2 --function-name {FUNCTION_NAME} --region {REGION}")
+        run_cmd(f"aws lambda wait function-updated-v2 --function-name {validated_function_name} --region {REGION}")
 
     print("\n=== Step 5: Configure Function URL ===")
     url_check = run_cmd(
-        f"aws lambda get-function-url-config --function-name {FUNCTION_NAME} --region {REGION}",
+        f"aws lambda get-function-url-config --function-name {validated_function_name} --region {REGION}",
         check=False,
     )
     function_url = None
@@ -137,7 +145,7 @@ def deploy(build_id: str | None = None) -> str | None:
         cors_config = '{"AllowOrigins":["*"],"AllowMethods":["*"],"AllowHeaders":["*"]}'
         create_url_cmd = (
             f"aws lambda create-function-url-config "
-            f"--function-name {FUNCTION_NAME} "
+            f"--function-name {validated_function_name} "
             f"--auth-type NONE "
             f"--cors '{cors_config}' "
             f"--region {REGION}"
@@ -147,7 +155,7 @@ def deploy(build_id: str | None = None) -> str | None:
 
         perm_cmd = (
             f"aws lambda add-permission "
-            f"--function-name {FUNCTION_NAME} "
+            f"--function-name {validated_function_name} "
             f"--statement-id FunctionURLAllowPublicAccess "
             f"--action lambda:InvokeFunctionUrl "
             f"--principal '*' "
@@ -164,5 +172,16 @@ def deploy(build_id: str | None = None) -> str | None:
     return function_url
 
 
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Build and release the SafeAnes Lambda inference image.")
+    parser.add_argument(
+        "--function-name",
+        default=FUNCTION_NAME,
+        help=f"AWS Lambda function to update (defaults to {FUNCTION_NAME})",
+    )
+    args = parser.parse_args(argv)
+    deploy(function_name=args.function_name)
+
+
 if __name__ == "__main__":
-    deploy()
+    main()
