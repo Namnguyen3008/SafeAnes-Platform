@@ -70,8 +70,7 @@ class Settings:
     max_samples_per_response: int = 200_000
     # Replay frames touch both UC04/UC05 numeric tracks and waveform sources.
     # Retaining a tightly bounded working set avoids reopening VitalDB tracks
-    # while strictly enforcing cloud container memory limits (512MB).
-    signal_file_cache_entries: int = 6
+    signal_file_cache_entries: int = 64
     model_series_cache_entries: int = 2
     prediction_cache_entries: int = 2
     inference_url: str | None = None
@@ -155,7 +154,7 @@ class Settings:
             max_signal_range_seconds=float(os.getenv("SAFEANES_MAX_SIGNAL_RANGE_SECONDS", "3600")),
             max_waveform_range_seconds=float(os.getenv("SAFEANES_MAX_WAVEFORM_RANGE_SECONDS", "120")),
             max_samples_per_response=int(os.getenv("SAFEANES_MAX_SAMPLES", "200000")),
-            signal_file_cache_entries=int(os.getenv("SAFEANES_SIGNAL_FILE_CACHE_ENTRIES", "24")),
+            signal_file_cache_entries=int(os.getenv("SAFEANES_SIGNAL_FILE_CACHE_ENTRIES", "64")),
             model_series_cache_entries=int(os.getenv("SAFEANES_MODEL_SERIES_CACHE_ENTRIES", "2")),
             prediction_cache_entries=int(os.getenv("SAFEANES_PREDICTION_CACHE_ENTRIES", "2")),
             inference_url=(os.getenv("SAFEANES_INFERENCE_URL") or os.getenv("SAFEANES_LAMBDA_INFERENCE_URL") or None),
