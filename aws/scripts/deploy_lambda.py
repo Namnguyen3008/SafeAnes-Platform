@@ -26,7 +26,14 @@ IMAGE_REPOSITORY_URI = f"{ECR_REGISTRY_URI}/{REPO_NAME}"
 
 def run_cmd(cmd: str, check: bool = True) -> str:
     print(f"\n>> {cmd}")
-    res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    res = subprocess.run(
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     if check and res.returncode != 0:
         print(f"Error (Exit {res.returncode}):\n{res.stderr}")
         raise RuntimeError(f"Command failed: {cmd}\nStderr: {res.stderr}")
@@ -91,7 +98,10 @@ def deploy(build_id: str | None = None, function_name: str = FUNCTION_NAME) -> s
 
     print("\n=== Step 2: Build Docker Image ===")
     local_image_uri = f"safeanes-inference:{tag}"
-    build_cmd = f"docker build -t {local_image_uri} -f aws/lambda_inference/Dockerfile ."
+    build_cmd = (
+        f"docker buildx build --platform linux/amd64 --provenance=false --load "
+        f"-t {local_image_uri} -f aws/lambda_inference/Dockerfile ."
+    )
     run_cmd(build_cmd)
 
     print("\n=== Step 3: Tag, Push, and Resolve Immutable Image ===")
