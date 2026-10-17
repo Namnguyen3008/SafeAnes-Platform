@@ -74,6 +74,8 @@ class Settings:
     signal_file_cache_entries: int = 6
     model_series_cache_entries: int = 2
     prediction_cache_entries: int = 2
+    inference_url: str | None = None
+    offload_inference: bool = False
     build_id: str = field(default_factory=get_backend_build_id)
 
     def __post_init__(self) -> None:
@@ -156,4 +158,6 @@ class Settings:
             signal_file_cache_entries=int(os.getenv("SAFEANES_SIGNAL_FILE_CACHE_ENTRIES", "24")),
             model_series_cache_entries=int(os.getenv("SAFEANES_MODEL_SERIES_CACHE_ENTRIES", "2")),
             prediction_cache_entries=int(os.getenv("SAFEANES_PREDICTION_CACHE_ENTRIES", "2")),
+            inference_url=(os.getenv("SAFEANES_INFERENCE_URL") or os.getenv("SAFEANES_LAMBDA_INFERENCE_URL") or None),
+            offload_inference=os.getenv("SAFEANES_OFFLOAD_INFERENCE", "false").strip().lower() in ("true", "1", "yes"),
         )

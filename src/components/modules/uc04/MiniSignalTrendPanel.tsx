@@ -40,18 +40,30 @@ export function MiniSignalTrendPanel() {
     const normalizedQuality = waveform.quality?.toUpperCase() ?? "UNKNOWN";
     const quality = (allowedQualities.has(normalizedQuality) ? normalizedQuality : "UNKNOWN") as WaveformPoint["quality"];
     const sampleCount = Math.min(waveform.timestamps.length, waveform.values.length);
-    const recordedSamples: WaveformPoint[] = Array.from({ length: sampleCount }, (_, index) => {
+    const cutoffTime = Math.max(0, (vitalDbCurrentTimeSeconds ?? 0) - 14.0);
+    let startIndex = 0;
+    let low = 0;
+    let high = sampleCount;
+    while (low < high) {
+      const mid = low + Math.floor((high - low) / 2);
+      if (waveform.timestamps[mid] < cutoffTime) low = mid + 1;
+      else high = mid;
+    }
+    startIndex = low;
+
+    const recordedSamples: WaveformPoint[] = [];
+    for (let index = startIndex; index < sampleCount; index += 1) {
       const eventTime = waveform.timestamps[index] * 1_000;
       const value = waveform.values[index];
-      return {
+      recordedSamples.push({
         eventTime,
         receivedTime: eventTime,
         sourceDevice,
         value: value !== null && Number.isFinite(value) ? value : null,
         quality,
         provenance: "DIRECT",
-      };
-    });
+      });
+    }
     return {
       seed: 0,
       signal: "ABP",

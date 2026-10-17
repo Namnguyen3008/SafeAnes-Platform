@@ -63,6 +63,21 @@ class LiveInferenceWorker:
         """Run synchronized inference within a thread worker."""
         t0 = time.perf_counter()
         try:
+            if getattr(self.model_manager.settings, "offload_inference", False) and getattr(self.model_manager.settings, "inference_url", None):
+                predictions = self.model_manager.predict(case_id, model_id, prediction_time_s)
+                latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+                return LiveInferenceResult(
+                    session_id=session_id,
+                    generation=generation,
+                    case_id=case_id,
+                    model_id=model_id,
+                    prediction_time=prediction_time_s,
+                    predictions=predictions,
+                    coverage=1.0,
+                    missing_features=[],
+                    latency_ms=latency_ms,
+                )
+
             extracted = self.window_loader.get_window(case_id, model_id, prediction_time_s)
             if extracted is None:
                 return None

@@ -334,7 +334,15 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
   }, [applyBuffers, cases, createOrRestoreSession, mode, selectedCaseId]);
 
   const mutateSession = useCallback(async (action: string, body?: unknown) => {
-    const active = sessionRef.current;
+    let active = sessionRef.current;
+    if (!active && selectedCaseIdRef.current) {
+      try {
+        active = await createOrRestoreSession(selectedCaseIdRef.current, true);
+      } catch (cause) {
+        setError(errorText(cause));
+        return;
+      }
+    }
     if (!active) return;
     try {
       const next = await replayAction(active.session_id, action, body);
@@ -342,10 +350,38 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
       updateSession(next);
       setError(null);
     } catch (cause) {
+      const errMessage = errorText(cause);
+      const isSessionLost = errMessage.includes("REPLAY_SESSION_NOT_FOUND") || errMessage.includes("404");
+      if (isSessionLost && selectedCaseIdRef.current) {
+        try {
+          const caseId = selectedCaseIdRef.current;
+          const targetTime = action === "/seek" && Number.isFinite(Number((body as { time_s?: number })?.time_s))
+            ? Number((body as { time_s?: number })?.time_s)
+            : active.current_time_s;
+          const recreated = await safeAnesClient.createReplaySession(caseId, active.speed ?? 1, targetTime);
+          const normalized = normalizeSession(recreated);
+          updateSession(normalized);
+          setError(null);
+          if (action === "/play" || action === "/resume") {
+            const played = await replayAction(normalized.session_id, action);
+            updateSession(played);
+          } else if (action === "/pause") {
+            const paused = await replayAction(normalized.session_id, action);
+            updateSession(paused);
+          } else if (action === "/speed") {
+            const sped = await replayAction(normalized.session_id, action, body);
+            updateSession(sped);
+          }
+          return;
+        } catch (recoverCause) {
+          setError(errorText(recoverCause));
+          return;
+        }
+      }
       if (sessionRef.current?.session_id !== active.session_id) return;
-      setError(errorText(cause));
+      setError(errMessage);
     }
-  }, [updateSession]);
+  }, [createOrRestoreSession, updateSession]);
 
   const play = useCallback(async () => mutateSession("/play"), [mutateSession]);
   const pause = useCallback(async () => mutateSession("/pause"), [mutateSession]);
@@ -418,6 +454,12 @@ export function SafeAnesDataProvider({ children }: { children: React.ReactNode }
       if (!message) return; // Native EventSource reconnect/error event.
       try {
         const body = JSON.parse(message) as { code?: string; message?: string };
+        if (body.code === "REPLAY_SESSION_NOT_FOUND") {
+          if (selectedCaseIdRef.current) {
+            void createOrRestoreSession(selectedCaseIdRef.current, true).catch(() => undefined);
+          }
+          return;
+        }
         setError(`${body.code ?? "REPLAY_STREAM_FAILED"}: ${body.message ?? "Recorded data stream failed."}`);
       } catch {
         setError("Recorded VitalDB replay stream failed.");

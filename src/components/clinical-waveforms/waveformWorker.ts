@@ -49,9 +49,17 @@ export interface WaveformWorkerResizePayload {
   ratio: number;
 }
 
+export interface WaveformWorkerTransitionPayload {
+  transition: WaveformPresentationTransition;
+  simulationTimeMs: number;
+  playbackSpeed: ClinicalWaveformSource["playbackSpeed"];
+  playbackStatus: ClinicalWaveformSource["playbackStatus"];
+}
+
 export type WaveformWorkerMessage =
   | { type: "INIT"; payload: WaveformWorkerInitPayload }
   | { type: "UPDATE_SOURCE"; payload: WaveformWorkerUpdatePayload }
+  | { type: "UPDATE_TRANSITION"; payload: WaveformWorkerTransitionPayload }
   | { type: "UPDATE_CONFIG"; payload: WaveformWorkerConfigPayload }
   | { type: "RESIZE"; payload: WaveformWorkerResizePayload }
   | { type: "DISPOSE" };
@@ -235,9 +243,28 @@ function handleUpdateSource(payload: WaveformWorkerUpdatePayload): void {
     lastCanonicalTime = newSource.simulationTimeMs;
   }
 
+  if (!newSource.recordedSamples && source.recordedSamples) {
+    newSource.recordedSamples = source.recordedSamples;
+  }
+
   source = newSource;
   updateStreamIfNeeded(newSource);
   updateSweepState(sweep, newSource);
+  scheduler?.schedule();
+}
+
+function handleUpdateTransition(payload: WaveformWorkerTransitionPayload): void {
+  if (!source) return;
+  source.simulationTimeMs = payload.simulationTimeMs;
+  source.playbackSpeed = payload.playbackSpeed;
+  source.playbackStatus = payload.playbackStatus;
+  presentation = {
+    targetTimeMs: payload.transition.toTimeMs,
+    transition: payload.transition,
+  };
+  lastCanonicalTime = payload.simulationTimeMs;
+  lastRenderTime = waveformPresentationRenderTime(payload.transition, performance.now());
+  updateSweepState(sweep, source);
   scheduler?.schedule();
 }
 
@@ -556,6 +583,9 @@ self.onmessage = (event: MessageEvent<WaveformWorkerMessage>) => {
       break;
     case "UPDATE_SOURCE":
       handleUpdateSource(msg.payload);
+      break;
+    case "UPDATE_TRANSITION":
+      handleUpdateTransition(msg.payload);
       break;
     case "UPDATE_CONFIG":
       handleUpdateConfig(msg.payload);

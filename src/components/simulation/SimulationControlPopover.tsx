@@ -492,11 +492,39 @@ function VitalDbReplayControls({
   const currentTime = session?.current_time_s ?? 0;
   const duration = session?.duration_seconds ?? 1;
   const [scrubTime, setScrubTime] = useState(currentTime);
+  const isDraggingRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => setScrubTime(currentTime), [currentTime]);
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      setScrubTime(currentTime);
+    }
+  }, [currentTime]);
 
   const run = (action: () => Promise<void>) => { void action().catch(() => undefined); };
-  const commitSeek = () => run(() => replay.seek(scrubTime));
+  
+  const commitSeek = (targetTime?: number) => {
+    isDraggingRef.current = false;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const t = targetTime ?? scrubTime;
+    run(() => replay.seek(t));
+  };
+
+  const handleScrubberChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(event.target.value);
+    isDraggingRef.current = true;
+    setScrubTime(val);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      commitSeek(val);
+    }, 200);
+  };
+
   const primaryAction = () => {
     if (session?.status === "PAUSED") run(replay.resume);
     else run(replay.play);
@@ -630,9 +658,9 @@ function VitalDbReplayControls({
           max={duration}
           step={1}
           value={Math.min(scrubTime, duration)}
-          onChange={(event) => setScrubTime(Number(event.target.value))}
-          onPointerUp={commitSeek}
-          onKeyUp={commitSeek}
+          onChange={handleScrubberChange}
+          onPointerUp={() => commitSeek()}
+          onKeyUp={() => commitSeek()}
           aria-valuetext={`${formatReplayTime(scrubTime)} / ${formatReplayTime(duration)}`}
           disabled={!session || replay.isLoading}
           className="h-2 w-full cursor-pointer accent-safe-cyan disabled:cursor-default"

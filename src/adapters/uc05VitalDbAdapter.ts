@@ -200,9 +200,10 @@ export function projectUC05VitalDbView(view: UC05VitalDbView, asOfSeconds: numbe
     const values: Array<number | null> = [];
     const isMissing: boolean[] = [];
     const length = Math.min(waveform.timestamps.length, waveform.values.length);
+    const earliestAllowed = Math.max(0, asOfSeconds - 14.0);
     for (let index = 0; index < length; index += 1) {
       const timestamp = waveform.timestamps[index];
-      if (!Number.isFinite(timestamp) || timestamp > asOfSeconds) continue;
+      if (!Number.isFinite(timestamp) || timestamp < earliestAllowed || timestamp > asOfSeconds) continue;
       const value = waveform.values[index];
       timestamps.push(timestamp);
       values.push(value);
@@ -214,7 +215,7 @@ export function projectUC05VitalDbView(view: UC05VitalDbView, asOfSeconds: numbe
       values,
       is_missing: isMissing,
       missing_intervals: waveform.missing_intervals
-        .filter((interval) => interval.start_time_s <= asOfSeconds)
+        .filter((interval) => interval.end_time_s >= earliestAllowed && interval.start_time_s <= asOfSeconds)
         .map((interval) => ({ ...interval, end_time_s: Math.min(interval.end_time_s, asOfSeconds) })),
       end_time_s: Math.min(waveform.end_time_s, asOfSeconds),
     }];
@@ -313,17 +314,31 @@ function buildRecordedWaveformSamples(
   sourceDevice: string,
 ): RecordedWaveformSample[] {
   const length = Math.min(waveform.timestamps.length, waveform.values.length);
-  return Array.from({ length }, (_, index) => {
+  const cutoffTime = waveform.end_time_s - 14.0;
+  let startIndex = 0;
+  let low = 0;
+  let high = length;
+  while (low < high) {
+    const mid = low + Math.floor((high - low) / 2);
+    if (waveform.timestamps[mid] < cutoffTime) low = mid + 1;
+    else high = mid;
+  }
+  startIndex = low;
+
+  const result: RecordedWaveformSample[] = [];
+  const quality = normalizeQuality(waveform.quality);
+  for (let index = startIndex; index < length; index += 1) {
     const eventTime = waveform.timestamps[index] * 1_000;
-    return {
+    result.push({
       eventTime,
       receivedTime: eventTime,
       sourceDevice,
       value: waveform.is_missing[index] || waveform.values[index] === null ? null : waveform.values[index],
-      quality: normalizeQuality(waveform.quality),
+      quality,
       provenance: "DIRECT" as const,
-    };
-  });
+    });
+  }
+  return result;
 }
 
 function cacheRecordedSamples(

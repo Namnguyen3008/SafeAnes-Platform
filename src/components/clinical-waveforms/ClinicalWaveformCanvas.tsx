@@ -11,7 +11,7 @@ import {
   waveformPresentationRenderTime,
   WaveformStream,
 } from "./waveformEngine";
-import type { ClinicalWaveformSource, WaveformWindow } from "./waveformEngine";
+import type { ClinicalWaveformSource, WaveformPoint, WaveformWindow } from "./waveformEngine";
 import type { WaveformPresentationTransition } from "./waveformEngine";
 
 export interface ClinicalWaveformCanvasProps {
@@ -100,6 +100,8 @@ export function ClinicalWaveformCanvas({
   const lastCanonicalTimeRef = useRef<number | null>(null);
   const lastRenderTimeRef = useRef<number>(source.simulationTimeMs);
   const lastGridDimensionsRef = useRef<{ width: number; height: number; ratio: number; grid: boolean } | null>(null);
+  const lastSamplesRef = useRef<readonly WaveformPoint[] | undefined>(undefined);
+  const lastConfigRef = useRef<{ color: string; showCursor: boolean; sweepMode: boolean; waitingLabel: string } | null>(null);
 
   if (!sweepRef.current) sweepRef.current = createInitialSweepState(source);
 
@@ -348,14 +350,39 @@ export function ClinicalWaveformCanvas({
 
     // Forward updates to worker when active
     if (isWorkerActiveRef.current && workerRef.current) {
-      workerRef.current.postMessage({
-        type: "UPDATE_SOURCE",
-        payload: { source, transition },
-      });
-      workerRef.current.postMessage({
-        type: "UPDATE_CONFIG",
-        payload: { color, showCursor, sweepMode, waitingLabel },
-      });
+      const samplesChanged = source.recordedSamples !== lastSamplesRef.current;
+      if (samplesChanged) {
+        lastSamplesRef.current = source.recordedSamples;
+        workerRef.current.postMessage({
+          type: "UPDATE_SOURCE",
+          payload: { source, transition },
+        });
+      } else {
+        workerRef.current.postMessage({
+          type: "UPDATE_TRANSITION",
+          payload: {
+            transition,
+            simulationTimeMs: source.simulationTimeMs,
+            playbackSpeed: source.playbackSpeed,
+            playbackStatus: source.playbackStatus,
+          },
+        });
+      }
+
+      const prevConfig = lastConfigRef.current;
+      if (
+        !prevConfig ||
+        prevConfig.color !== color ||
+        prevConfig.showCursor !== showCursor ||
+        prevConfig.sweepMode !== sweepMode ||
+        prevConfig.waitingLabel !== waitingLabel
+      ) {
+        lastConfigRef.current = { color, showCursor, sweepMode, waitingLabel };
+        workerRef.current.postMessage({
+          type: "UPDATE_CONFIG",
+          payload: { color, showCursor, sweepMode, waitingLabel },
+        });
+      }
       return;
     }
 

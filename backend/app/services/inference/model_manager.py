@@ -61,6 +61,11 @@ class ModelManager:
         if self._initialized:
             return
         self._initialized = True
+        if getattr(self.settings, "offload_inference", False) and getattr(self.settings, "inference_url", None):
+            logger.info("Offloading ML inference to remote AWS Lambda: %s", self.settings.inference_url)
+            for model_id, service in self.services.items():
+                service.readiness_status = "INTEGRATION_READY"
+            return
         if not self._load_models:
             return
         for model_id, service in self.services.items():
@@ -82,18 +87,22 @@ class ModelManager:
 
     def statuses(self) -> list[dict[str, Any]]:
         result = []
+        is_offloaded = getattr(self.settings, "offload_inference", False) and getattr(self.settings, "inference_url", None)
         for model_id, contract in self.contracts.items():
             service = self.services.get(model_id)
-            loaded = service is not None and service.model is not None
-            readiness = getattr(service, "readiness_status", "BLOCKED" if model_id in self._construction_errors else "NOT_LOADED")
-            if not loaded and (model_id in self._load_errors or model_id in self._construction_errors):
-                readiness = "BLOCKED"
-            if model_id in self._construction_errors or model_id in self._load_errors:
-                blockers = ["MODEL_NOT_READY: configured artifact is missing or failed integrity validation"]
-            elif not loaded and readiness != "INTEGRATION_READY":
-                blockers = ["MODEL_NOT_READY: model weights have not been loaded"]
+            loaded = True if is_offloaded else (service is not None and service.model is not None)
+            readiness = "INTEGRATION_READY" if is_offloaded else getattr(service, "readiness_status", "BLOCKED" if model_id in self._construction_errors else "NOT_LOADED")
+            if not is_offloaded:
+                if not loaded and (model_id in self._load_errors or model_id in self._construction_errors):
+                    readiness = "BLOCKED"
+                if model_id in self._construction_errors or model_id in self._load_errors:
+                    blockers = ["MODEL_NOT_READY: configured artifact is missing or failed integrity validation"]
+                elif not loaded and readiness != "INTEGRATION_READY":
+                    blockers = ["MODEL_NOT_READY: model weights have not been loaded"]
+                else:
+                    blockers = list(getattr(service, "readiness_blockers", ())) if readiness != "INTEGRATION_READY" else []
             else:
-                blockers = list(getattr(service, "readiness_blockers", ())) if readiness != "INTEGRATION_READY" else []
+                blockers = []
             result.append({
                 "model_id": contract.model_id,
                 "model_version": contract.model_version or "NOT_RECORDED",
@@ -125,6 +134,31 @@ class ModelManager:
             raise invalid_time_range("prediction_time_s must be finite case-relative seconds")
         if prediction_time_s < 0 or prediction_time_s > duration:
             raise invalid_time_range("prediction_time_s must be within the recorded case duration")
+
+        if getattr(self.settings, "offload_inference", False) and getattr(self.settings, "inference_url", None):
+            endpoint = self.settings.inference_url.rstrip("/")
+            model_slug = "uc05" if ("uc05" in model_id.lower() or "respformer" in model_id.lower()) else "uc04"
+            target_url = f"{endpoint}/predict/{model_slug}"
+            try:
+                import json
+                import urllib.request
+                req_data = json.dumps({
+                    "case_id": case_id,
+                    "model_id": model_id,
+                    "prediction_time_s": float(prediction_time_s),
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    target_url,
+                    data=req_data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=10.0) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                    return payload.get("predictions", [])
+            except Exception as exc:
+                logger.warning("Remote Lambda inference failed (%s); falling back to local if loaded", exc)
+
         model_status = self.status(service.contract.model_id)
         if not model_status["inference_ready"]:
             raise model_not_ready(
