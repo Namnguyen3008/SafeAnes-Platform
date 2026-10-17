@@ -40,8 +40,7 @@ _WAVEFORMS = {
     "resp": "Primus/RESP",
 }
 _DERIVED_EVENT_LOOKBACK_SECONDS = 180.0
-_SNAPSHOT_HISTORY_SECONDS = 300.0
-_MEDICATION_LOOKBACK_SECONDS = 60.0
+_SNAPSHOT_HISTORY_SECONDS = 1_800.0
 _MAX_REPLAY_CHUNK_SECONDS = 30.0
 
 
@@ -75,8 +74,8 @@ class ReplayStreamService:
         window = min(_SNAPSHOT_HISTORY_SECONDS, self.settings.max_signal_range_seconds)
         uc04 = self.uc04_view.read(normalized, as_of_s=as_of_s, window_seconds=window)
         uc05 = self.uc05_view.read(normalized, as_of_s=as_of_s, window_seconds=window)
-        medication_start = max(0.0, as_of_s - _MEDICATION_LOOKBACK_SECONDS)
-        medication_tracks = self._medication_tracks(normalized, tracks, medication_start, as_of_s)
+        history_start = max(0.0, as_of_s - window)
+        medication_tracks = self._medication_tracks(normalized, tracks, history_start, as_of_s)
         return {
             "case_id": normalized,
             "as_of_s": as_of_s,
@@ -215,8 +214,6 @@ class ReplayStreamService:
                 if exc.code in {"INSUFFICIENT_DATA", "TRACK_NOT_AVAILABLE"}:
                     continue
                 raise
-            if "observations" in rows and len(rows["observations"]) > 10:
-                rows["observations"] = rows["observations"][-10:]
             output.append({
                 **rows,
                 "record_class": "OBSERVED_PUMP_TRACK",

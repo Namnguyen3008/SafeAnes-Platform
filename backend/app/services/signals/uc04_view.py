@@ -75,7 +75,7 @@ class UC04VitalDBViewService:
         waveform = None
         waveform_name = "SNUADC/ART"
         if waveform_name in track_by_name and as_of > 0:
-            waveform_start = max(0.0, as_of - 15.0)
+            waveform_start = max(0.0, as_of - 30.0)
             if as_of > waveform_start:
                 try:
                     waveform = self.signals.waveform(normalized, waveform_name, waveform_start, as_of)

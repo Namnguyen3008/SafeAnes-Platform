@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import gc
 import json
 
 from fastapi import APIRouter, Request
@@ -94,8 +93,6 @@ async def stream_session(session_id: str, request: Request) -> StreamingResponse
                     )
                     yield _sse("reset", frame)
                     last_data_time = current_time
-                    del frame
-                    _trim_memory()
                 elif current_time > last_data_time:
                     chunk_limit = runtime.replay_stream.max_chunk_seconds
                     if current_time - last_data_time >= max(
@@ -109,8 +106,6 @@ async def stream_session(session_id: str, request: Request) -> StreamingResponse
                         )
                         yield _sse("reset", frame)
                         last_data_time = current_time
-                        del frame
-                        _trim_memory()
                     else:
                         cursor = last_data_time
                         while cursor < current_time:
@@ -141,20 +136,6 @@ async def stream_session(session_id: str, request: Request) -> StreamingResponse
                 })
                 return
 
-            if session["status"] in ("PLAYING", "PAUSED") and getattr(runtime, "replay_scheduler", None) is not None:
-                try:
-                    inferences = await runtime.replay_scheduler.schedule_if_due(
-                        session_id=session["session_id"],
-                        generation=session.get("generation", 1),
-                        case_id=session["case_id"],
-                        current_time_s=current_time,
-                        speed=session["speed"],
-                    )
-                    for inf in inferences:
-                        yield _sse("inference_result", inf.as_dict())
-                except Exception:
-                    pass
-
             if session["status"] == "COMPLETED":
                 yield _sse("complete", session)
                 return
@@ -170,12 +151,3 @@ async def stream_session(session_id: str, request: Request) -> StreamingResponse
 def _sse(event: str, payload: dict) -> str:
     data = json.dumps(payload, separators=(",", ":"), allow_nan=False)
     return f"event: {event}\ndata: {data}\n\n"
-
-
-def _trim_memory() -> None:
-    gc.collect()
-    try:
-        import ctypes
-        ctypes.CDLL("libc.so.6").malloc_trim(0)
-    except Exception:
-        pass

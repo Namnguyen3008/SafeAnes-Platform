@@ -73,7 +73,7 @@ class UC05VitalDBViewService:
                 signal_rows[signal] = raw["observations"]
 
         waveforms: dict[str, Any] = {}
-        wave_start = max(0.0, as_of - min(15.0, self.settings.max_waveform_range_seconds))
+        wave_start = max(0.0, as_of - min(30.0, self.settings.max_waveform_range_seconds))
         for name, track_name in _WAVEFORM_TRACKS.items():
             metadata = tracks.get(track_name)
             if metadata is None or metadata.get("track_type") != "WAVEFORM" or as_of <= wave_start:
