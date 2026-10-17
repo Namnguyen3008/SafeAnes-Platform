@@ -517,6 +517,352 @@ def test_replay_stream_coalesces_large_playback_lag_to_current_snapshot(tmp_path
     assert stream.delta_windows == []
 
 
+def test_replay_stream_emits_data_while_inference_is_slow(tmp_path):
+    from backend.app.services.inference.inference_worker import LiveInferenceResult
+
+    with _client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/replay/sessions",
+            json={"case_id": "1", "start_time_s": 0, "speed": 1},
+        )
+        session_id = created.json()["session_id"]
+        runtime = client.app.state.runtime
+        manager = runtime.replay
+        original_get = manager.get
+        times = iter((0.0, 0.0, 1.0, 2.0, 3.0))
+
+        def get_at_stream_times(requested_session_id):
+            session = original_get(requested_session_id)
+            current_time = next(times, 3.0)
+            return {
+                **session,
+                "status": "PLAYING",
+                "current_time_s": current_time,
+                "current_time_seconds": current_time,
+            }
+
+        manager.get = get_at_stream_times
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_inference(session):
+            started.set()
+            await release.wait()
+            return [
+                LiveInferenceResult(
+                    session_id=session["session_id"],
+                    generation=int(session["generation"]),
+                    case_id=session["case_id"],
+                    model_id=UC04_CONTRACT.model_id,
+                    prediction_time=float(session["current_time_seconds"]),
+                    predictions=[{"class": "test"}],
+                    coverage=1.0,
+                    missing_features=[],
+                    latency_ms=1.0,
+                )
+            ]
+
+        runtime.replay_scheduler.schedule_if_due = slow_inference
+
+        class _Request:
+            app = client.app
+            calls = 0
+
+            async def is_disconnected(self):
+                self.calls += 1
+                return self.calls > 8
+
+        response = asyncio.run(stream_session(session_id, _Request()))
+
+        async def read_data_during_inference():
+            iterator = response.body_iterator
+            events = []
+            try:
+                for _ in range(8):
+                    item = await asyncio.wait_for(anext(iterator), timeout=2)
+                    event = item.decode("utf-8") if isinstance(item, bytes) else item
+                    events.append(event)
+                    if event.startswith("event: data"):
+                        assert started.is_set()
+                        assert not release.is_set()
+                        release.set()
+                        for _ in range(6):
+                            item = await asyncio.wait_for(anext(iterator), timeout=2)
+                            event = item.decode("utf-8") if isinstance(item, bytes) else item
+                            events.append(event)
+                            if event.startswith("event: inference_result"):
+                                return events
+                pytest.fail("replay data was not streamed while inference was pending")
+            finally:
+                release.set()
+                await iterator.aclose()
+
+        events = asyncio.run(read_data_during_inference())
+
+    assert any(event.startswith("event: data") for event in events)
+    result_event = next(event for event in events if event.startswith("event: inference_result"))
+    assert '"source":"LIVE_INFERENCE"' in result_event
+
+
+def test_replay_stream_coalesces_pending_inference_to_latest_snapshot(tmp_path):
+    with _client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/replay/sessions",
+            json={"case_id": "1", "start_time_s": 0, "speed": 1},
+        )
+        session_id = created.json()["session_id"]
+        runtime = client.app.state.runtime
+        manager = runtime.replay
+        original_get = manager.get
+        times = iter((0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0))
+        observed_times = []
+
+        def get_at_stream_times(requested_session_id):
+            session = original_get(requested_session_id)
+            current_time = next(times, 5.0)
+            observed_times.append(current_time)
+            return {
+                **session,
+                "status": "PLAYING",
+                "current_time_s": current_time,
+                "current_time_seconds": current_time,
+            }
+
+        manager.get = get_at_stream_times
+        first_started = asyncio.Event()
+        second_started = asyncio.Event()
+        release_first = asyncio.Event()
+        scheduled_times = []
+
+        async def record_latest_inference(session):
+            scheduled_times.append(float(session["current_time_seconds"]))
+            if len(scheduled_times) == 1:
+                first_started.set()
+                await release_first.wait()
+            else:
+                second_started.set()
+            return []
+
+        runtime.replay_scheduler.schedule_if_due = record_latest_inference
+
+        class _Request:
+            app = client.app
+
+            async def is_disconnected(self):
+                return False
+
+        response = asyncio.run(stream_session(session_id, _Request()))
+
+        async def verify_coalescing():
+            iterator = response.body_iterator
+            try:
+                await anext(iterator)  # first snapshot
+                await anext(iterator)  # reset
+                await asyncio.wait_for(first_started.wait(), timeout=2)
+                await anext(iterator)  # snapshot at t=1
+                await anext(iterator)  # data at t=1
+                await anext(iterator)  # snapshot at t=2
+                await anext(iterator)  # data at t=2
+                assert scheduled_times == [0.0]
+                release_first.set()
+                await anext(iterator)  # next tick harvests and schedules the latest time
+                await asyncio.wait_for(second_started.wait(), timeout=2)
+                return list(scheduled_times), max(observed_times)
+            finally:
+                release_first.set()
+                await iterator.aclose()
+
+        scheduled, latest_observed = asyncio.run(verify_coalescing())
+
+    assert len(scheduled) == 2
+    assert scheduled[1] == latest_observed
+
+
+def test_replay_stream_does_not_schedule_inference_when_paused(tmp_path):
+    with _client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/replay/sessions",
+            json={"case_id": "1", "start_time_s": 0, "speed": 1},
+        )
+        session_id = created.json()["session_id"]
+        client.post(f"/api/v1/replay/sessions/{session_id}/play")
+        client.post(f"/api/v1/replay/sessions/{session_id}/pause")
+        runtime = client.app.state.runtime
+        schedule_calls = 0
+
+        async def record_schedule(session):
+            nonlocal schedule_calls
+            schedule_calls += 1
+            return []
+
+        runtime.replay_scheduler.schedule_if_due = record_schedule
+
+        class _Request:
+            app = client.app
+
+            async def is_disconnected(self):
+                return False
+
+        response = asyncio.run(stream_session(session_id, _Request()))
+
+        async def read_first_events():
+            iterator = response.body_iterator
+            await anext(iterator)
+            await anext(iterator)
+            await iterator.aclose()
+
+        asyncio.run(read_first_events())
+
+    assert schedule_calls == 0
+
+
+def test_replay_stream_discards_result_from_old_generation(tmp_path):
+    from backend.app.services.inference.inference_worker import LiveInferenceResult
+
+    with _client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/replay/sessions",
+            json={"case_id": "1", "start_time_s": 0, "speed": 1},
+        )
+        session_id = created.json()["session_id"]
+        client.post(f"/api/v1/replay/sessions/{session_id}/play")
+        runtime = client.app.state.runtime
+        manager = runtime.replay
+        original_get = manager.get
+        get_calls = 0
+        schedule_calls = 0
+        started = asyncio.Event()
+        release = asyncio.Event()
+        completed = asyncio.Event()
+
+        def advance_generation(requested_session_id):
+            nonlocal get_calls
+            session = original_get(requested_session_id)
+            get_calls += 1
+            generation = int(session["generation"]) + (1 if get_calls >= 3 else 0)
+            return {**session, "generation": generation}
+
+        manager.get = advance_generation
+
+        async def stale_inference(session):
+            nonlocal schedule_calls
+            schedule_calls += 1
+            if schedule_calls > 1:
+                return []
+            started.set()
+            await release.wait()
+            completed.set()
+            return [
+                LiveInferenceResult(
+                    session_id=session["session_id"],
+                    generation=int(session["generation"]),
+                    case_id=session["case_id"],
+                    model_id=UC04_CONTRACT.model_id,
+                    prediction_time=float(session["current_time_seconds"]),
+                    predictions=[{"class": "stale"}],
+                    coverage=1.0,
+                    missing_features=[],
+                    latency_ms=1.0,
+                )
+            ]
+
+        runtime.replay_scheduler.schedule_if_due = stale_inference
+
+        class _Request:
+            app = client.app
+            calls = 0
+
+            async def is_disconnected(self):
+                self.calls += 1
+                return self.calls > 12
+
+        response = asyncio.run(stream_session(session_id, _Request()))
+
+        async def collect_after_generation_changes():
+            iterator = response.body_iterator
+            events = []
+            try:
+                await anext(iterator)  # snapshot, generation N
+                await anext(iterator)  # reset
+                await asyncio.wait_for(started.wait(), timeout=2)
+                await anext(iterator)  # next tick observes generation N+1
+                release.set()
+                for _ in range(6):
+                    try:
+                        item = await asyncio.wait_for(anext(iterator), timeout=2)
+                    except StopAsyncIteration:
+                        break
+                    events.append(item.decode("utf-8") if isinstance(item, bytes) else item)
+                return events
+            finally:
+                release.set()
+                await iterator.aclose()
+
+        events = asyncio.run(collect_after_generation_changes())
+
+    assert completed.is_set()
+    assert not any(event.startswith("event: inference_result") for event in events)
+
+
+def test_replay_stream_emits_safe_inference_error_event(tmp_path):
+    from backend.app.services.inference.inference_worker import LiveInferenceFailure
+
+    with _client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/replay/sessions",
+            json={"case_id": "1", "start_time_s": 0, "speed": 1},
+        )
+        session_id = created.json()["session_id"]
+        client.post(f"/api/v1/replay/sessions/{session_id}/play")
+        runtime = client.app.state.runtime
+
+        async def failed_inference(session):
+            return [
+                LiveInferenceFailure(
+                    session_id=session["session_id"],
+                    generation=int(session["generation"]),
+                    case_id=session["case_id"],
+                    model_id=UC04_CONTRACT.model_id,
+                    prediction_time=float(session["current_time_seconds"]),
+                )
+            ]
+
+        runtime.replay_scheduler.schedule_if_due = failed_inference
+
+        class _Request:
+            app = client.app
+            calls = 0
+
+            async def is_disconnected(self):
+                self.calls += 1
+                return self.calls > 10
+
+        response = asyncio.run(stream_session(session_id, _Request()))
+
+        async def collect_error_event():
+            iterator = response.body_iterator
+            events = []
+            try:
+                for _ in range(10):
+                    try:
+                        item = await asyncio.wait_for(anext(iterator), timeout=2)
+                    except StopAsyncIteration:
+                        break
+                    event = item.decode("utf-8") if isinstance(item, bytes) else item
+                    events.append(event)
+                    if event.startswith("event: inference_error"):
+                        return event
+                return "\n".join(events)
+            finally:
+                await iterator.aclose()
+
+        error_event = asyncio.run(collect_error_event())
+
+    assert error_event.startswith("event: inference_error")
+    assert '"code":"LIVE_INFERENCE_FAILED"' in error_event
+    assert "Traceback" not in error_event
+
+
 def test_cached_replay_predictions_are_filtered_at_the_frame_time():
     from backend.app.services.replay.stream import ReplayStreamService
 
