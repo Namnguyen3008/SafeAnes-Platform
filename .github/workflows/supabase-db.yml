@@ -1,0 +1,37 @@
+name: Supabase local database
+
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "backend/tests/test_supabase_vitaldb_ingest.py"
+      - "tests/supabase-vitaldb-contract.test.cjs"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - "backend/tests/test_supabase_vitaldb_ingest.py"
+      - "tests/supabase-vitaldb-contract.test.cjs"
+
+jobs:
+  local-database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Reset local database from migrations
+        run: supabase db reset --local
+
+      - name: Run VitalDB schema and RLS tests
+        run: supabase test db supabase/tests/database/safeanes_vitaldb.test.sql --local
+
+      - name: Lint local database schema
+        run: supabase db lint --local --level error

@@ -133,7 +133,7 @@
   Chạy: node --test tests/supabase-vitaldb-contract.test.cjs, python -m pytest backend/tests/test_supabase_vitaldb_ingest.py -q và supabase test db supabase/tests/database/safeanes_vitaldb.test.sql
   Kết quả mong đợi: PASS; Node contract test (3/3) và ingest pytest (6/6) đã pass. pgTAP local còn chờ Docker.
 
-- [ ] **Step 5: Commit contract tests và mọi sửa parity cần thiết**
+- [x] **Step 5: Commit contract tests và mọi sửa parity cần thiết**
 
       git add tests/supabase-vitaldb-contract.test.cjs src/lib/api/supabaseVitalDbClient.ts scripts/ingest_vitaldb_to_supabase.py supabase/migrations/20261017085710_safeanes_vitaldb_contract.sql
       git commit -m "test: pin VitalDB Supabase data contract"
@@ -171,7 +171,7 @@
 
   So sánh production schema snapshot chỉ đọc với local migration. Ghi lại conflict, delta table/policy cuối cùng, phương án rollback migration và vị trí cần đặt credential cho staging runner. Dừng trước supabase db push, remote SQL hoặc ingest cho đến khi rollout được ủy quyền riêng.
 
-- [ ] **Step 6: Commit CI và tài liệu operator**
+- [x] **Step 6: Commit CI và tài liệu operator**
 
       git add .github/workflows/supabase-db.yml docs/operations/VITALDB_INGEST.md backend/tests/test_supabase_vitaldb_ingest.py
       git commit -m "ci: test Supabase schema and RLS locally"
