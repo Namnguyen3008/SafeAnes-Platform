@@ -11,11 +11,11 @@
     },
     "SafeAnes-UC05-RespFormer": {
       "artifact_path": "safeanes_uc05_respformer_v1/respformer.pt",
-      "artifact_sha256": "e7785f06bf107c82df7df56966fb1262644b8f0ab1c14b825bee7d5601d854de",
+      "artifact_sha256": "1e95a7e28242980247d6a8e62d6f9268866ddee7aeefc7743b5b398cbf43d203",
       "supporting_artifacts": {
         "config.json": "6f402ec3d388028b4fc7b05b8ea8d187402b0d8fdd6a67dfba2af16d8a02b69a",
         "signal_schema.json": "c7387214dabba32f48eb59bdd9e0d7fbea1bde5eb3af699d450881b8461b54d9",
-        "calibration_thresholds_metrics.json": "870a8ce5b1d008741a6fbb645114728c822075ac736e6bda9975ecadbcd22866"
+        "calibration_thresholds_metrics.json": "e4ab0d776361df819dffad5a1a239c3e89e36687596696cd07df8603873a5448"
       }
     }
   }

@@ -1,0 +1,85 @@
+{
+  "system_name": "SafeAnes UC05 v2 Early Warning System",
+  "model_checkpoint": "supervised_epoch005.pt",
+  "checkpoint_sha256": "fb24a0fd45dc6a46ea529ea0dd5cd8306bb16aae1b70bfc10dbc7a101deee183",
+  "calibration_method": "Platt Scaling (Logistic Regression on Logits)",
+  "calibration_parameters": {
+    "1min": {
+      "scale": 1.9856,
+      "bias": -3.2440,
+      "formula": "p1 = 1.0 / (1.0 + exp(-(1.9856 * logit1 - 3.2440)))"
+    },
+    "3min": {
+      "scale": 2.2147,
+      "bias": -2.0482,
+      "formula": "p3 = 1.0 / (1.0 + exp(-(2.2147 * logit3 - 2.0482)))"
+    },
+    "5min": {
+      "scale": 2.4040,
+      "bias": -1.3944,
+      "formula": "p5 = 1.0 / (1.0 + exp(-(2.4040 * logit5 - 1.3944)))"
+    }
+  },
+  "recommended_architecture": "Dual-Tier Alerting Architecture (Cảnh báo Kép)",
+  "tiers": {
+    "tier_1_early_warning": {
+      "name": "Cảnh Báo Vàng (Early Warning Alert)",
+      "target_probability": "p5",
+      "threshold": 0.07,
+      "persistence_windows": 2,
+      "persistence_duration_seconds": 60.0,
+      "cooldown_seconds": 180.0,
+      "notification_type": "VISUAL_BANNER_NON_AUDIBLE",
+      "clinical_action": "Bác sĩ kiểm tra thông khí, độ giãn nở phổi, vị trí ống nội khí quản, hút đờm nhớt",
+      "clinical_performance": {
+        "median_lead_time_minutes": 4.0,
+        "actionable_recall_1_to_5min": "73.2% [65.1% - 81.0%]",
+        "in_horizon_recall_3_to_5min": "46.5% [38.0% - 55.3%]",
+        "false_alarms_per_hour": 0.408,
+        "false_alarm_interval_hours": 2.45,
+        "ppv": "8.9%",
+        "nna": 11.2
+      }
+    },
+    "tier_2_high_urgency": {
+      "name": "Cảnh Báo Đỏ (High Urgency Alert)",
+      "target_probability": "p5",
+      "threshold": 0.25,
+      "persistence_windows": 1,
+      "persistence_duration_seconds": 30.0,
+      "cooldown_seconds": 300.0,
+      "notification_type": "AUDIBLE_CHIME_AND_FLASHING_BANNER",
+      "clinical_action": "Nguy cơ tụt SpO2 cấp diễn rất cao! Can thiệp tăng FiO2 khẩn cấp, thông khí bóp bóng bằng tay",
+      "clinical_performance": {
+        "median_lead_time_minutes": 4.5,
+        "actionable_recall_1_to_5min": "63.8% [55.3% - 71.7%]",
+        "in_horizon_recall_3_to_5min": "40.9% [32.3% - 49.6%]",
+        "false_alarms_per_hour": 0.205,
+        "false_alarm_interval_hours": 4.88,
+        "ppv": "14.5%",
+        "nna": 6.9
+      }
+    }
+  },
+  "alternative_operating_modes": {
+    "sensitivity_focus_mode": {
+      "name": "Chế độ Ưu tiên Tối đa Độ nhạy (High Risk Patient / Trẻ em / Bệnh nhân Béo phì nặng)",
+      "threshold": 0.02,
+      "persistence_windows": 2,
+      "cooldown_seconds": 180.0,
+      "actionable_recall": "76.4%",
+      "false_alarms_per_hour": 0.850,
+      "false_alarm_interval_hours": 1.18,
+      "warning": "Mức báo động giả cao gấp đôi, chỉ khuyến nghị cho ca nguy cơ hô hấp rất cao"
+    },
+    "high_specificity_mode": {
+      "name": "Chế độ Giảm Thiểu Tối đa Phiền Nhiễu (Quiet OR Mode)",
+      "threshold": 0.15,
+      "persistence_windows": 2,
+      "cooldown_seconds": 180.0,
+      "actionable_recall": "63.0%",
+      "false_alarms_per_hour": 0.225,
+      "false_alarm_interval_hours": 4.44
+    }
+  }
+}

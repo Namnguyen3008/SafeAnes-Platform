@@ -7,7 +7,7 @@ UC04_MODEL_SHA256 = (
     "e8222e0cc9d3416c7382c9fbb53d9331608c7ae92b06f48b00e1933e7af93daa"
 )
 UC05_MODEL_SHA256 = (
-    "e7785f06bf107c82df7df56966fb1262644b8f0ab1c14b825bee7d5601d854de"
+    "1e95a7e28242980247d6a8e62d6f9268866ddee7aeefc7743b5b398cbf43d203"
 )
 UC04_CONFIG_SHA256 = (
     "0889aa7639939861bc0c59db8928aea614c164d7e216475bfa7b31dd28bc411e"
@@ -22,7 +22,7 @@ UC05_SCHEMA_SHA256 = (
     "c7387214dabba32f48eb59bdd9e0d7fbea1bde5eb3af699d450881b8461b54d9"
 )
 UC05_CALIBRATION_SHA256 = (
-    "870a8ce5b1d008741a6fbb645114728c822075ac736e6bda9975ecadbcd22866"
+    "e4ab0d776361df819dffad5a1a239c3e89e36687596696cd07df8603873a5448"
 )
 
 
@@ -102,7 +102,7 @@ UC04_CONTRACT = ModelContract(
 
 UC05_CONTRACT = ModelContract(
     model_id="SafeAnes-UC05-RespFormer",
-    model_version=f"v1+sha256:{UC05_MODEL_SHA256}",
+    model_version=f"v2+sha256:{UC05_MODEL_SHA256}",
     task=(
         "New SpO2 <90% sustained for >=60 seconds at 1/3/5 minutes; "
         "auxiliary signal-derived ventilation-loss pattern"
@@ -184,9 +184,9 @@ UC05_CONTRACT = ModelContract(
         "historical_stream_evaluator_gate": "PPG plus capno or AWP; weaker than the exported signal schema and not used for production inference",
     },
     calibration_method=(
-        "saved per-horizon temperature scaling for hypoxemia logits; no calibration supplied for ventilation-pattern output"
+        "frozen Platt scaling (logistic sigmoid) with dual-tier clinical alerting policy (Tier 1: 0.07, Tier 2: 0.25)"
     ),
-    decision_threshold={"5m": 0.1182835621637828},
+    decision_threshold={"5m": 0.07, "5m_tier2": 0.25},
     supported_runtime=("CPU verified", "CUDA not verified"),
     supporting_artifacts={
         "config.json": UC05_CONFIG_SHA256,

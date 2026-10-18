@@ -275,13 +275,33 @@ class UC05InferenceService(BaseInferenceService):
         if self.calibration is None:
             raise ModelLoadError("UC05 saved calibration artifact has not been loaded")
         predictions: list[ModelPrediction] = []
-        temperatures = self.calibration["temperature"]
-        threshold = float(self.calibration["threshold_5m"])
+        temperatures = self.calibration.get("temperature", {})
+        platt_calibration = self.calibration.get("platt", {})
+        threshold = float(self.calibration.get("threshold_5m", 0.07))
+        tier1_threshold = float(self.calibration.get("tier1_threshold_5m", threshold))
+        tier2_threshold = float(self.calibration.get("tier2_threshold_5m", 0.25))
+
         for horizon, logit in zip(self.contract.prediction_horizons, raw_logits):
-            temperature = float(temperatures[str(horizon)])
-            scaled = max(-80.0, min(80.0, float(logit) / temperature))
-            score = 1.0 / (1.0 + math.exp(-scaled))
+            horizon_str = str(horizon)
+            if platt_calibration and horizon_str in platt_calibration:
+                scale = float(platt_calibration[horizon_str]["scale"])
+                bias = float(platt_calibration[horizon_str]["bias"])
+                z = max(-80.0, min(80.0, scale * float(logit) + bias))
+                score = 1.0 / (1.0 + math.exp(-z))
+                cal_method = "platt_scaling"
+            else:
+                temperature = float(temperatures.get(horizon_str, 1.0))
+                scaled = max(-80.0, min(80.0, float(logit) / temperature))
+                score = 1.0 / (1.0 + math.exp(-scaled))
+                cal_method = "temperature_scaling"
+
             is_threshold_horizon = horizon == 5
+            t1_decision = score >= tier1_threshold if is_threshold_horizon else None
+            t2_decision = score >= tier2_threshold if is_threshold_horizon else None
+            clinical_alert = (
+                "TIER_2_RED" if t2_decision else ("TIER_1_YELLOW" if t1_decision else "SAFE")
+            ) if is_threshold_horizon else None
+
             predictions.append(
                 ModelPrediction(
                     model_id=self.contract.model_id,
@@ -293,13 +313,17 @@ class UC05InferenceService(BaseInferenceService):
                     task=self.contract.task,
                     raw_output=float(logit),
                     interpreted_output={
-                        "kind": "temperature_scaled_probability",
+                        "kind": "calibrated_probability",
                         "value": score,
                         "calibrated": True,
-                        "calibration_method": "temperature_scaling",
-                        "temperature": temperature,
-                        "threshold": threshold if is_threshold_horizon else None,
-                        "threshold_decision": score >= threshold if is_threshold_horizon else None,
+                        "calibration_method": cal_method,
+                        "threshold": tier1_threshold if is_threshold_horizon else None,
+                        "threshold_decision": t1_decision,
+                        "tier1_threshold": tier1_threshold if is_threshold_horizon else None,
+                        "tier1_decision": t1_decision,
+                        "tier2_threshold": tier2_threshold if is_threshold_horizon else None,
+                        "tier2_decision": t2_decision,
+                        "clinical_alert": clinical_alert,
                         "input_contract_mode": input_contract_mode,
                     },
                     horizon_if_supported=horizon,
