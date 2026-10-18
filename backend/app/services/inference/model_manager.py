@@ -278,7 +278,14 @@ class ModelManager:
 
     def _canonical_model_id(self, model_id: str) -> str:
         normalized = model_id.casefold()
-        aliases = {"uc04": UC04_CONTRACT.model_id, "uc05": UC05_CONTRACT.model_id}
+        aliases = {
+            "uc04": UC04_CONTRACT.model_id,
+            "uc05": UC05_CONTRACT.model_id,
+            "safeanes-uc04-hypoformer": UC04_CONTRACT.model_id,
+            "safeanes-uc05-respformer": UC05_CONTRACT.model_id,
+            "hypoformer": UC04_CONTRACT.model_id,
+            "respformer": UC05_CONTRACT.model_id,
+        }
         canonical = aliases.get(normalized, model_id)
         if canonical not in self.contracts:
             raise ApiServiceError("MODEL_NOT_FOUND", "Model ID is not allowlisted", status_code=404)
@@ -410,7 +417,8 @@ def _remote_predictions(
             or not math.isclose(float(prediction.prediction_time), prediction_time_s, abs_tol=1e-6)
             or not math.isclose(float(prediction.window_start), expected_start, abs_tol=1e-6)
             or not math.isclose(float(prediction.window_end), prediction_time_s, abs_tol=1e-6)
-            or horizon not in contract.prediction_horizons
+            or (horizon is not None and horizon not in contract.prediction_horizons)
+            or (horizon is None and contract.model_id != UC05_CONTRACT.model_id)
             or prediction.quality_status not in {"GOOD", "DEGRADED"}
             or not isinstance(prediction.interpreted_output, dict)
             or not math.isfinite(float(prediction.raw_output))

@@ -17,8 +17,10 @@ build/
 backend/build/
 **/__pycache__/
 *.py[cod]
-/backend/data/vitaldb/raw/
 /backend/data/vitaldb/cache/
+!/backend/data/vitaldb/raw/
+!/backend/data/vitaldb/raw/**
+!/backend/data/vitaldb/raw/*.vital
 !/backend/data/vitaldb/processed/
 !/backend/data/vitaldb/processed/**
 !/backend/data/manifests/
@@ -33,6 +35,7 @@ backend/build/
 !/models/**/*.json
 !/models/**/*.md
 *.vital
+!/backend/data/vitaldb/raw/*.vital
 *.pth
 *.log
 logs/

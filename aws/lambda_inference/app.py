@@ -408,7 +408,7 @@ def handle_uc04_prediction(service: UC04InferenceService, body: dict[str, Any]) 
         missing_features=body["missing_features"],
     )
     preds = service.predict_window(_inference_window(service, body), prepared_input=prepared)
-    return [p.to_dict() if hasattr(p, "to_dict") else p.__dict__ for p in preds]
+    return [p.as_dict() if hasattr(p, "as_dict") else (p.to_dict() if hasattr(p, "to_dict") else p.__dict__) for p in preds]
 
 
 def handle_uc05_prediction(service: UC05InferenceService, body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -425,7 +425,7 @@ def handle_uc05_prediction(service: UC05InferenceService, body: dict[str, Any]) 
             missing_features=body.get("missing_features", ()),
         )
         preds = service.predict_window(_inference_window(service, body), prepared_input=prepared)
-        return [p.to_dict() if hasattr(p, "to_dict") else p.__dict__ for p in preds]
+        return [p.as_dict() if hasattr(p, "as_dict") else (p.to_dict() if hasattr(p, "to_dict") else p.__dict__) for p in preds]
 
     # Default calibrated fallback using frozen Platt Scaling parameters
     prediction_time = float(body.get("prediction_time_s", 300.0))
